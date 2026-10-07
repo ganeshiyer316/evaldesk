@@ -9,7 +9,7 @@ It follows the error-analysis method taught in the AI evals course by Hamel Husa
 ## Try it in 60 seconds
 
 ```sh
-git clone <this repository> && cd evaldesk
+git clone https://github.com/ganeshiyer316/evaldesk.git && cd evaldesk
 npm run site
 ```
 
@@ -74,3 +74,7 @@ npm run demo    # rebuild the demo files from scripts/demo/
 ```
 
 Plain JavaScript, no dependencies. The logic is in `site/core/`, the page in `site/app.js`, the optional local server in `scripts/server.mjs`.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).

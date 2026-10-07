@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "A review desk for subject-matter experts: read your AI product's conversations, find its failure patterns, and build checks you can trust.",
+  "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=22"
