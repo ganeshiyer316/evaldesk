@@ -31,9 +31,9 @@ Done:
 
 - **Not tried with a real OpenRouter key.** Grouping and judges are covered by tests with a fake model, and worked in the tool this was extracted from, but nobody has run them from a browser against OpenRouter yet. Ganesh should add a key in Settings and try "Group my notes now" and one judge run on the demo.
 - **Decisions for Ganesh:** whether the README should keep crediting the evals course by name.
-- A screenshot in the README.
 - The judge results inside the demo are sample numbers, labelled as such in the version note. With only one failing example in the tuning set they show a wide "likely range", which is honest but thin.
-- Narrow screens: the Review tab is laid out for a laptop or bigger. Not checked on a phone.
+- Phones: there is a phone layout (one column, each conversation on its own screen, tabs scroll sideways), checked at phone size in a desktop browser. **Not tried on a real phone**, in particular selecting words to comment by touch.
+- README screenshots are in `docs/images/`. Retake them from the Payments demo (`?demo=payments`) if the page changes much.
 - A custom pack needs a file in `site/packs/` and its name in `site/backend.js`. There is no way to add one from the page yet.
 
 ## Parked ideas

@@ -6,6 +6,10 @@ Load your AI product's conversations, read them, and comment like you would in a
 
 It follows the error-analysis method taught in the AI evals course by Hamel Husain and Shreya Shankar (open coding, axial coding, LLM judges), in plain words.
 
+![Reviewing a conversation in EvalDesk: the user's question, the AI's reasoning, the tool calls and the reply, with a reviewer's comment on the words that went wrong](docs/images/review.png)
+
+*The Payments demo. Every conversation in it is invented.*
+
 ## Try it in 60 seconds
 
 **Open [ganeshiyer316.github.io/evaldesk](https://ganeshiyer316.github.io/evaldesk/)** and click **Try the Payments demo**. Nothing to install, no sign-up.
@@ -19,7 +23,7 @@ npm run site
 
 Then open **http://localhost:8022**. You need Node 22 or newer. There is nothing to install and no build step.
 
-The demo is 40 invented conversations, already part-reviewed, so every tab has something to show.
+The demo is 40 invented conversations, already part-reviewed, so every tab has something to show. To link someone straight into it, add `?demo=payments` or `?demo=healthcare` to the address.
 
 ## What you do with it
 
@@ -33,6 +37,8 @@ The demo is 40 invented conversations, already part-reviewed, so every tab has s
 | **Trends** | How often each pattern appears, release by release. |
 
 The full guide is in [docs/guide.md](docs/guide.md).
+
+![A judge's scorecard: how many real failures it catches and how many good replies it leaves alone, version by version](docs/images/judges.png)
 
 ## Your own data
 

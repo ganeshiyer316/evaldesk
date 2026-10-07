@@ -65,7 +65,18 @@ async function route() {
   const id = rawId ? decodeURIComponent(rawId) : null;
   if (!backend) backend = await connect();
   if (!domains.length) domains = await backend.domains();
-  const nextDomain = domains.some((item) => item.id === wantedDomain) ? wantedDomain : domains.find((item) => item.traces)?.id ?? domains[0].id;
+  // A link ending in ?demo=payments opens straight into that demo, but never over existing work.
+  const demo = new URLSearchParams(location.search).get('demo');
+  if (demo && !route.demoTried) {
+    route.demoTried = true;
+    if (domains.some((item) => item.id === demo && !item.traces)) {
+      try {
+        const response = await fetch(`demo/${demo}.json`);
+        if (response.ok) { await backend.act(demo, 'restore', { bundle: await response.json() }); domains = await backend.domains(); }
+      } catch { /* the first page still offers the demo button */ }
+    }
+  }
+  const nextDomain = domains.some((item) => item.id === wantedDomain) ? wantedDomain : domains.some((item) => item.id === demo && item.traces) ? demo : domains.find((item) => item.traces)?.id ?? domains[0].id;
   if (nextDomain !== domainId || !data) {
     domainId = nextDomain;
     data = await backend.data(domainId);
@@ -248,6 +259,7 @@ function casePanel(trace) {
     m.steps != null && `🧩 ${m.steps} steps`, m.replyChars != null && `✉️ ${m.replyChars} characters`, trace.person && `👤 ${trace.person}`, trace.group && `👥 ${trace.group}`]
     .filter(Boolean).map((item) => `<span>${esc(item)}</span>`).join('');
   return `<section class="panel case">
+    <div class="back"><a data-do="back-to-list">← All ${data.traces.length} conversations</a><span><a data-do="step" data-step="-1">‹ Previous</a> · <a data-do="step" data-step="1">Next ›</a></span></div>
     <h2>${esc(trace.id)} <span class="tag ${proactive(trace) ? 'kind-alt' : ''}">${esc(proactive(trace) ? kindName(trace.kind) : trace.input?.label ?? 'Message')}</span>
       ${trace.release ? `<span class="tag kind-alt">${esc(trace.release)}</span>` : ''} <span class="small" style="font-size:13px;color:var(--muted);font-weight:400">${when(trace.at)}</span></h2>
     <div class="meta">${meta}</div>
@@ -319,7 +331,7 @@ function renderReview() {
   if (!data.traces.length) return starterPage();
   const list = filtered();
   const trace = data.traces.find((item) => item.id === currentId);
-  return `<div class="review">${listPanel(list)}${casePanel(trace)}${sidePanel(trace)}</div>`;
+  return `<div class="review ${trace ? 'open' : ''}">${listPanel(list)}${casePanel(trace)}${sidePanel(trace)}</div>`;
 }
 
 function patternCard(mode, list) {
@@ -623,6 +635,9 @@ function render() {
   if (composer) $('#noteText')?.focus();
   const current = $('.list li.current');
   current?.scrollIntoView({ block: 'nearest' });
+  // On a phone each conversation is its own screen, so start it from the top.
+  if (view === 'review' && render.shown !== currentId && matchMedia('(max-width: 700px)').matches) window.scrollTo(0, 0);
+  render.shown = currentId;
   clearInterval(poll);
   const busy = () => data.grouping.running || data.judges.some((judge) => judge.run?.running);
   if (busy()) poll = setInterval(async () => {
@@ -799,6 +814,18 @@ function selectionInText() {
   return { pending, rect: range.getBoundingClientRect() };
 }
 
+// A touch selection has no mouseup, so phones offer the Comment button once the selection settles.
+document.addEventListener('selectionchange', () => {
+  if (!matchMedia('(pointer: coarse)').matches || view !== 'review') return;
+  clearTimeout(document.selectionTimer);
+  document.selectionTimer = setTimeout(() => {
+    const button = $('#noteFromSelection');
+    const found = selectionInText();
+    if (found) button._pending = found.pending;
+    button.hidden = !found;
+  }, 400);
+});
+
 document.addEventListener('mouseup', (event) => {
   const button = $('#noteFromSelection');
   if (event.target === button) return;
@@ -954,6 +981,8 @@ async function previewDialog() {
 async function doAction(t) {
   const name = t.dataset.do;
   if (name === 'close-dialog') return $('#dialog').close();
+  if (name === 'step') return move(Number(t.dataset.step));
+  if (name === 'back-to-list') { currentId = null; composer = null; return setHash('review'); }
   if (name === 'open-data') return dataDialog();
   if (name === 'open-settings') return settingsDialog();
   if (name === 'sent-log') return sentDialog();

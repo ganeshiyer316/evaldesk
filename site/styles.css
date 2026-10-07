@@ -218,3 +218,36 @@ pre.code { background: var(--paper); border: 1px solid var(--line); border-radiu
 .releases { margin-top: 16px; max-width: 760px; }
 .releases ul { padding-left: 18px; }
 .releases .remove { margin-left: 6px; color: var(--faint); }
+
+/* Phones: one column, the conversation on its own screen, tabs that scroll sideways */
+.back { display: none; }
+@media (max-width: 700px) {
+  .top { position: static; gap: 8px 12px; padding: 8px 12px; }
+  .top nav { order: 5; width: 100%; overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+  .top nav a { white-space: nowrap; padding: 6px 10px; }
+  .top .tools { margin-left: auto; }
+  .progress { order: 6; width: 100%; margin-left: 0; }
+  .progress:empty { display: none; }
+  .bar { width: 80px; }
+  main { padding: 10px 10px 60px; }
+  .review, .judges, .cols { grid-template-columns: minmax(0, 1fr); }
+  .sec-title { white-space: normal; }
+  .sec-gist { display: none; }
+  .block .text, .note, .pcard { overflow-wrap: anywhere; }
+  table.grid:not(.versions) th { min-width: 110px; }
+  table.versions { display: block; overflow-x: auto; }
+  .judge .acts label, #j-model { width: 100%; }
+  .panel { padding: 12px; border-radius: 12px; }
+  .review.open > .panel.sticky:first-child { display: none; }
+  .review:not(.open) > .case, .review:not(.open) > aside:last-child { display: none; }
+  .back { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 8px; font-size: 14px; }
+  .back a { cursor: pointer; }
+  .case h2 { font-size: 18px; }
+  .keys, kbd { display: none; }
+  .floating { position: fixed; left: 50% !important; top: auto !important; bottom: 18px; transform: translateX(-50%); padding: 10px 18px; font-size: 16px; }
+  .statusbar { flex-wrap: wrap; }
+  .pcard .acts, .acts { flex-wrap: wrap; }
+  input, select, textarea { font-size: 16px; max-width: 100%; }
+  .releases .acts input { width: 100%; }
+  dialog { padding: 16px; }
+}
