@@ -8,12 +8,16 @@ It follows the error-analysis method taught in the AI evals course by Hamel Husa
 
 ## Try it in 60 seconds
 
+**Open [ganeshiyer316.github.io/evaldesk](https://ganeshiyer316.github.io/evaldesk/)** and click **Try the Payments demo**. Nothing to install, no sign-up.
+
+Or run it on your own computer:
+
 ```sh
 git clone https://github.com/ganeshiyer316/evaldesk.git && cd evaldesk
 npm run site
 ```
 
-Open **http://localhost:8022** and click **Try the Payments demo**. You need Node 22 or newer. There is nothing to install and no build step.
+Then open **http://localhost:8022**. You need Node 22 or newer. There is nothing to install and no build step.
 
 The demo is 40 invented conversations, already part-reviewed, so every tab has something to show.
 

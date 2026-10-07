@@ -16,7 +16,7 @@ EvalDesk: an open-source review desk that lets subject-matter experts review an 
 
 ## State on 2026-10-07
 
-**Public repository, no hosted site yet.** The code is at https://github.com/ganeshiyer316/evaldesk (MIT, open source, decided by Ganesh on 2026-10-07). The hosted page on GitHub Pages is **not** published; that needs Ganesh's go-ahead.
+**Public repository and hosted page.** The code is at https://github.com/ganeshiyer316/evaldesk (MIT, open source, decided by Ganesh on 2026-10-07). The page is published at https://ganeshiyer316.github.io/evaldesk/ by `.github/workflows/pages.yml`: every push to `main` runs the tests and then publishes the `site/` folder, so **anything pushed to `main` goes live**.
 
 Done:
 
@@ -30,8 +30,8 @@ Done:
 ## Open
 
 - **Not tried with a real OpenRouter key.** Grouping and judges are covered by tests with a fake model, and worked in the tool this was extracted from, but nobody has run them from a browser against OpenRouter yet. Ganesh should add a key in Settings and try "Group my notes now" and one judge run on the demo.
-- **Decisions for Ganesh:** publishing the hosted page on GitHub Pages; whether the README should keep crediting the evals course by name.
-- **Before publishing the page:** a GitHub Pages workflow that publishes the `site/` folder; a screenshot in the README; a link to the live page in the README.
+- **Decisions for Ganesh:** whether the README should keep crediting the evals course by name.
+- A screenshot in the README.
 - The judge results inside the demo are sample numbers, labelled as such in the version note. With only one failing example in the tuning set they show a wide "likely range", which is honest but thin.
 - Narrow screens: the Review tab is laid out for a laptop or bigger. Not checked on a phone.
 - A custom pack needs a file in `site/packs/` and its name in `site/backend.js`. There is no way to add one from the page yet.
