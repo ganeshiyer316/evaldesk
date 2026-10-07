@@ -1,0 +1,16 @@
+{
+  "name": "evaldesk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A review desk for subject-matter experts: read your AI product's conversations, find its failure patterns, and build checks you can trust.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env scripts/server.mjs",
+    "site": "node scripts/server.mjs --static",
+    "demo": "node scripts/build-demo.mjs",
+    "test": "node --test"
+  }
+}

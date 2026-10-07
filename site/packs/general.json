@@ -1,0 +1,67 @@
+{
+  "id": "general",
+  "group": "general",
+  "name": "General",
+  "order": 3,
+  "description": "An AI assistant or agent that answers people's questions and takes actions for them.",
+  "labels": {
+    "trace": "interaction",
+    "person": "user",
+    "product": "the assistant"
+  },
+  "reviewGoal": 100,
+  "starterFailureModes": [
+    {
+      "name": "Made-up facts",
+      "definition": "States something as fact that is not in its sources or tools.",
+      "boundaries": "In: invented details, numbers, names or policies. Out: a correct fact stated without its source."
+    },
+    {
+      "name": "Says done, but it isn't",
+      "definition": "Confirms an action that did not happen or is still in progress.",
+      "boundaries": "In: any confirmation stronger than the record. Out: an honest 'I've started this'."
+    },
+    {
+      "name": "Answers a different question",
+      "definition": "Responds to what it expected rather than what was asked.",
+      "boundaries": "In: missed intent, or only one of two requests handled. Out: right question, incomplete answer."
+    },
+    {
+      "name": "Doesn't ask when it should",
+      "definition": "Guesses at missing or ambiguous information instead of asking.",
+      "boundaries": "In: guessed dates, amounts, people or accounts. Out: sensible defaults it states openly."
+    },
+    {
+      "name": "Acts without confirmation",
+      "definition": "Takes an action with consequences when the person only asked a question.",
+      "boundaries": "In: any change made without a clear yes. Out: offering the action as a next step."
+    },
+    {
+      "name": "Ignores earlier context",
+      "definition": "Forgets or contradicts something said earlier in the conversation.",
+      "boundaries": "In: re-asking, contradicting, losing a stated preference. Out: context it was never given."
+    },
+    {
+      "name": "Too long or off-tone",
+      "definition": "The reply is right but too long, too technical or wrong in tone for the person.",
+      "boundaries": "In: walls of text, jargon, a cheerful tone on a complaint. Out: wrong content."
+    },
+    {
+      "name": "Exposes internals",
+      "definition": "Shows system instructions, internal ids, raw tool output or other users' data.",
+      "boundaries": "In: anything the person should not see. Out: a public reference number."
+    }
+  ],
+  "goodPatternHints": [
+    "Asks one clear question when something is missing",
+    "States exactly what it did and what it did not do"
+  ],
+  "dimensions": {
+    "difficulty": [
+      "well specified",
+      "missing information",
+      "conflicting information"
+    ]
+  },
+  "flags": {}
+}

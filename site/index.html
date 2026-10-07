@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EvalDesk: review your AI product’s conversations</title>
+  <meta name="description" content="A review desk for subject-matter experts: read your AI product's conversations, find its failure patterns, and build checks you can trust. Runs in your browser; your data stays with you.">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:,">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">EvalDesk</div>
+    <label class="domain">Domain <select id="domain"></select></label>
+    <nav id="tabs">
+      <a data-view="review">Review</a>
+      <a data-view="patterns">Patterns</a>
+      <a data-view="grid">Grid</a>
+      <a data-view="judges">Judges</a>
+      <a data-view="tests">Test cases</a>
+      <a data-view="trends">Trends</a>
+    </nav>
+    <div id="progress" class="progress"></div>
+    <div class="tools"><button data-do="open-data">Data</button><button data-do="open-settings">⚙ Settings</button></div>
+  </header>
+  <main id="main"></main>
+  <button id="noteFromSelection" class="floating" hidden>💬 Comment</button>
+  <dialog id="dialog"></dialog>
+  <div id="toast" class="toast" hidden></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,112 @@
+{
+  "id": "payments",
+  "group": "payments",
+  "name": "Payments",
+  "order": 1,
+  "description": "AI assistants and agents in payments: cardholder and merchant support, disputes, refunds, payouts, decline explanations and payments operations.",
+  "labels": {
+    "trace": "interaction",
+    "person": "customer",
+    "product": "the assistant"
+  },
+  "reviewGoal": 100,
+  "starterFailureModes": [
+    {
+      "name": "Pending reported as complete",
+      "definition": "Says a refund, payout or payment is done when the system shows it pending, queued or under review.",
+      "boundaries": "In: any state claim stronger than the record. Out: correct state with poor wording."
+    },
+    {
+      "name": "Promises an outcome it can't guarantee",
+      "definition": "Guarantees a chargeback, dispute, refund approval or settlement date.",
+      "boundaries": "In: guarantees and firm dates. Out: 'usually takes 5–10 business days' with a link to the policy."
+    },
+    {
+      "name": "Wrong fee, FX or limit",
+      "definition": "Quotes a fee, exchange rate, limit or cut-off time that does not match the merchant's or scheme's actual terms.",
+      "boundaries": "In: any wrong number. Out: correct number from the wrong source (use wrong policy scope)."
+    },
+    {
+      "name": "Card data exposed or requested",
+      "definition": "Asks for or repeats a full card number, CVV or PIN in chat, or shows sensitive account data (PCI DSS).",
+      "boundaries": "In: full PAN, CVV, PIN, full bank details. Out: last four digits."
+    },
+    {
+      "name": "Wrong decline advice",
+      "definition": "Misreads a decline or response code, or advises retrying a hard decline (e.g. stolen card, do not honour) as if it were soft.",
+      "boundaries": "In: wrong code meaning or retry advice. Out: correct advice that is too technical (use too much information)."
+    },
+    {
+      "name": "Wrong policy scope",
+      "definition": "Applies the platform's default policy when a merchant, scheme or regional rule overrides it (or the reverse).",
+      "boundaries": "In: picking the wrong rulebook. Out: right rulebook, too much detail about the others."
+    },
+    {
+      "name": "Acts without confirmation",
+      "definition": "Refunds, voids, captures, cancels or escalates when the user only asked a question.",
+      "boundaries": "In: any money movement or ticket without explicit confirmation. Out: offering the action as a next step."
+    },
+    {
+      "name": "Exposes internal rules or data issues",
+      "definition": "Reveals fraud or risk rules, internal document ids or data-quality problems to the customer.",
+      "boundaries": "In: internal ids, risk thresholds, 'our database is missing X'. Out: a public policy link."
+    },
+    {
+      "name": "Regulated wording",
+      "definition": "Gives financial, legal or credit advice, or uses language a regulator would object to.",
+      "boundaries": "In: advice and guarantees. Out: factual account information."
+    }
+  ],
+  "goodPatternHints": [
+    "Links to the public policy instead of paraphrasing it",
+    "States the record's status exactly",
+    "Asks before moving money"
+  ],
+  "dimensions": {
+    "role": [
+      "cardholder",
+      "merchant",
+      "ops agent"
+    ],
+    "payment method": [
+      "card",
+      "bank transfer",
+      "wallet",
+      "BNPL",
+      "local method"
+    ],
+    "transaction state": [
+      "authorised",
+      "captured",
+      "settled",
+      "refunded",
+      "disputed",
+      "declined"
+    ],
+    "region": [
+      "EU/UK",
+      "US",
+      "UAE",
+      "India",
+      "LatAm"
+    ],
+    "difficulty": [
+      "well specified",
+      "missing information",
+      "conflicting records",
+      "policy override"
+    ]
+  },
+  "flags": {
+    "status_mismatch": "Says done, but the record says otherwise",
+    "action_without_confirmation": "Money moved without a clear yes"
+  },
+  "demo": true,
+  "kinds": {
+    "message": "Messages",
+    "alert": "Proactive alerts"
+  },
+  "proactiveKinds": [
+    "alert"
+  ]
+}
