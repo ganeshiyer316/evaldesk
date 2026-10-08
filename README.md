@@ -2,11 +2,13 @@
 
 A review desk for the people who know the subject, not just the people who write the code.
 
+Your product's logs are the camera: they show what happened. EvalDesk is the referee: it helps you decide whether it was any good.
+
 Load your AI product's conversations, read them, and comment like you would in a Google Doc. EvalDesk turns your notes into named failure patterns, AI checkers you can measure against your own judgement, and test cases to re-run after every change.
 
 It follows the error-analysis method taught in the AI evals course by Hamel Husain and Shreya Shankar (open coding, axial coding, LLM judges), in plain words.
 
-![Reviewing a conversation in EvalDesk: the user's question, the AI's reasoning, the tool calls and the reply, with a reviewer's comment on the words that went wrong](docs/images/review.png)
+![A conversation in EvalDesk where a tool failed and the reply made up a refund amount: the automatic checks flag both, and the failed step is shown in red](docs/images/review.png)
 
 *The Payments demo. Every conversation in it is invented.*
 
@@ -29,6 +31,7 @@ The demo is 40 invented conversations, already part-reviewed, so every tab has s
 
 | Tab | What it is for |
 |---|---|
+| **Automatic checks** | Before you do anything: plain rules, with no AI, flag replies that ignored a failed tool, quote a figure that came from nowhere, or were unusually slow or costly. |
 | **Review** | Read each conversation in four parts: what the user asked, what the AI reasoned, which tools ran, and what it replied. Select any words to comment. Mark it 👍 or 👎. |
 | **Patterns** | Your notes are grouped into failure patterns and good patterns. Approve, edit, merge or split them; your corrections stick. Each pattern gets a suggested way to handle it: fix it, a code check, or an LLM judge. |
 | **Grid** | Every pattern against every reviewed conversation, with how common each one is. |

@@ -4,7 +4,8 @@
 const METRICS = [
   ['latency', (value, pct) => `${value} s · slower than ${pct}%`],
   ['tokens', (value, pct) => `${value.toLocaleString('en-US')} tokens · more than ${pct}%`],
-  ['replyChars', (value, pct) => `${value} characters · longer than ${pct}%`]
+  ['replyChars', (value, pct) => `${value} characters · longer than ${pct}%`],
+  ['cost', (value, pct) => `$${value < 0.01 ? value.toFixed(4) : value.toFixed(2)} · costs more than ${pct}%`]
 ];
 
 // Adds chips for metrics at or above the 90th percentile of traces of the same kind.
@@ -23,7 +24,6 @@ export function withOutlierChips(traces, threshold = 90) {
       if (pct >= threshold) chips.push({ key, text: label(value, pct) });
     }
     const flags = [...(trace.flags ?? [])];
-    if (chips.some((chip) => chip.key === 'latency') && !flags.includes('slow')) flags.push('slow');
     return { ...trace, chips, flags };
   });
 }

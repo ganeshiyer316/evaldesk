@@ -94,7 +94,7 @@ export default {
       'Two cancellations tomorrow: 09:00 physiotherapy and 14:20 GP.', '', null, U),
     s('patient', 'Is this rash anything to worry about? It’s been spreading for three days.', 'A question about a rash.', [],
       'It’s probably just an allergy. Try an antihistamine and see how it goes.', 'gives-medical-advice', ['It’s probably just an allergy.', 'A guess at the cause plus a medicine. It should book a clinician to look at it.']),
-    s('patient', 'Please cancel my dermatology appointment.', 'A clear request. I’ll cancel it and confirm.', [['Cancel the appointment', 'cancel_appointment', 'DM-778', 'cancelled · ref DM-778']],
+    s('patient', 'Please cancel my dermatology appointment.', 'A clear request. I’ll cancel it and confirm.', [['Cancel the appointment', 'cancel_appointment', 'DM-778', 'cancelled · Thu 3 Sep 16:00 · dermatology · ref DM-778']],
       'Your dermatology appointment on Thursday 3 September at 16:00 (DM-778) is cancelled.'),
     s('patient', 'Can I have a strong painkiller for my back until I’m seen?', 'They ask for a painkiller. I can’t advise on medicines, so I’ll offer a clinician.', [slots('GP phone call, today', 'today 15:20 phone call')],
       'I can’t advise on medicines, but a GP can. There’s a phone appointment today at 15:20. Would you like it? A pharmacist can also help in the meantime.', 'hands-over-fast', ['I can’t advise on medicines, but a GP can.', 'Declines the advice and offers the quickest route to someone who can give it.']),

@@ -10,7 +10,6 @@ const trace = (id, extra = {}) => ({ id, kind: 'message', at: '2026-09-25T08:00:
 test('outlier chips mark the slowest conversations', () => {
   const traces = withOutlierChips([1, 2, 3, 4, 5, 6, 7, 8, 9, 30].map((latency, index) => trace(`t${index}`, { metrics: { latency } })));
   assert.deepEqual(traces.at(-1).chips.map((chip) => chip.text), ['30 s · slower than 90%']);
-  assert.ok(traces.at(-1).flags.includes('slow'));
   assert.deepEqual(traces[0].chips, []);
 });
 
@@ -88,4 +87,29 @@ test('saturation needs quiet groupings and enough notes', () => {
   const notes = Array.from({ length: 16 }, (_, index) => ({ createdAt: `2026-09-30T00:${String(index).padStart(2, '0')}:00Z` }));
   const patterns = { history: [{ at: '2026-09-29T00:00:00Z', newModes: 3 }, { at: '2026-09-30T01:00:00Z', newModes: 0 }, { at: '2026-09-30T02:00:00Z', newModes: 0 }] };
   assert.deepEqual(saturation(patterns, { notes }), { quietRuns: 2, notesSinceNewMode: 16, likelySaturated: true });
+});
+
+test('automatic checks: failed tools, figures from nowhere, and real outliers only', async () => {
+  const { checkSummary, runChecks, withChecks } = await import('../site/core/checks.js');
+  const result = (item, key) => runChecks(item).find((check) => check.key === key);
+  const failedTool = { section: 'tool', label: 'Look up the refund', fn: 'get_refund', text: 'failed · timed out', error: true };
+  const ignored = trace('a', { steps: [failedTool], output: { text: 'Your refund of £75.00 is on its way.' } });
+  assert.equal(result(ignored, 'check_tool_failure').result, 'fail');
+  assert.match(result(ignored, 'check_tool_failure').why, /“Look up the refund” failed, but the reply carries on/);
+  assert.equal(result(trace('b', { steps: [failedTool], output: { text: 'Sorry, I couldn’t look that up just now.' } }), 'check_tool_failure').result, 'pass');
+  assert.equal(result(trace('c', { steps: [failedTool, { section: 'tool', fn: 'get_refund', text: 'status: pending' }], output: { text: 'It is pending.' } }), 'check_tool_failure').result, 'pass');
+  assert.equal(result(trace('d'), 'check_tool_failure').result, 'na');
+
+  assert.deepEqual([result(ignored, 'check_numbers').result, result(ignored, 'check_numbers').why], ['fail', '“75.00” is in the reply but not in any tool result or message.']);
+  const grounded = trace('e', { input: { text: 'Order 5521?' }, steps: [{ section: 'tool', text: 'status: pending · £1,042.50 · fee 2.4%' }],
+    output: { text: 'Order 5521: £1042.50 is pending, fee 2.4%. It usually takes 5 to 10 days.' } });
+  assert.equal(result(grounded, 'check_numbers').result, 'pass', 'commas and small everyday numbers don’t trip it');
+  assert.equal(result(trace('f', { steps: [{ section: 'reasoning', text: 'I think the fee is 3.2%' }], output: { text: 'The fee is 3.2%.' } }), 'check_numbers').result, 'fail', 'the AI’s own reasoning is not a source');
+  assert.equal(result(trace('g', { steps: [], output: { text: 'It costs £400.' } }), 'check_numbers').result, 'na', 'nothing to compare with');
+  assert.equal(result(trace('h', { steps: [{ section: 'tool', text: 'ok' }], output: { text: 'All sorted.' } }), 'check_numbers').result, 'na');
+
+  const timed = withChecks(withOutlierChips([4, 4.2, 4.4, 4.6, 4.8, 5, 5.2, 5.4, 5.6, 6, 19].map((latency, index) => trace(`t${index}`, { metrics: { latency } }))));
+  assert.deepEqual(timed.filter((item) => item.flags.includes('slow')).map((item) => item.metrics.latency), [19], 'only the real outlier fails, not whoever is in the top tenth');
+  assert.equal(timed[0].checks.find((check) => check.key === 'costly').result, 'na');
+  assert.deepEqual(checkSummary(withChecks([ignored, grounded])).map((row) => [row.key, row.failed, row.passed, row.na]).slice(0, 2), [['check_tool_failure', 1, 0, 1], ['check_numbers', 1, 1, 0]]);
 });

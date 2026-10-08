@@ -9,6 +9,7 @@ import { DEFAULT_JUDGE_MODEL, defaultCriterion, draftPrompt, emptyJudges, flagAl
 import { HANDLING, draftTest, emptyTests, suggestHandling, testsCsv, testsJsonl, testSummary, updateTest } from './tasks.js';
 import { isReviewed, modeGrid, normalizeReleases, pickNext, releasesFromTraces, saturation, toCsv, trendsByRelease, withOutlierChips } from './stats.js';
 import { sentLog } from './openrouter.js';
+import { checkSummary, withChecks } from './checks.js';
 
 export const BUNDLE_VERSION = 1;
 const DOCS = ['traces', 'state', 'patterns', 'judges', 'tests', 'releases', 'profile'];
@@ -69,7 +70,7 @@ export function createEngine({ store, packs, settings, linkBase = '', extraRelea
 
   async function load(domainId) {
     const [rawTraces, state, patterns, judges, tests, releases, profile] = await Promise.all(DOCS.map((name) => store.get(domainId, name)));
-    const traces = withOutlierChips((rawTraces ?? []).map(normalizeTrace));
+    const traces = withChecks(withOutlierChips((rawTraces ?? []).map(normalizeTrace)));
     const description = String(profile?.description ?? '').trim();
     return {
       traces, state: { ...emptyState(), ...(state ?? {}) }, patterns: { ...emptyPatterns(), ...(patterns ?? {}) },
@@ -128,7 +129,7 @@ export function createEngine({ store, packs, settings, linkBase = '', extraRelea
       tests: tests.tests, testSummary: testSummary(tests.tests),
       handling: Object.fromEntries(patterns.failureModes.map((mode) => [mode.key, suggestHandling({ mode, grid, traces, codeFaultFlags: domain.codeFaultFlags ?? [] })])),
       judges: judges.judges.map((judge) => judgeView({ judge, grid, traces, domainId })), judgeModel,
-      domain, profile, traces, state, patterns, grid, trends: trendsByRelease({ grid, releases }),
+      domain, profile, traces, checkSummary: checkSummary(traces), state, patterns, grid, trends: trendsByRelease({ grid, releases }),
       saturation: saturation(patterns, state), releases, manualReleases,
       reviewed: traces.filter((trace) => isReviewed(state, trace.id)).length,
       grouping: { available: Boolean(apiKey), model, running: Boolean(status?.running), error: status?.error ?? null, autoEvery: autoGroupEvery }

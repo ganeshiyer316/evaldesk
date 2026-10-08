@@ -23,15 +23,20 @@ export function buildDemo(spec) {
   const at = (index, extraHours = 0) => new Date(START + index * 12 * HOUR + Math.floor(noise(index + 1) * 5 * HOUR) + extraHours * HOUR).toISOString();
   const traces = spec.scenarios.map((item, index) => {
     const id = `${spec.prefix}-${String(index + 1).padStart(3, '0')}`;
-    const steps = [{ section: 'reasoning', label: 'Reasoning', text: item.reason },
-      ...item.tools.map(([label, fn, request, text]) => ({ section: 'tool', label, fn, request, text, short: label.toLowerCase(), detail: `${(0.3 + noise(index * 7 + fn.length)).toFixed(1)} s` }))];
+    // Times and costs are invented too: tools take under a second or two, the model takes the rest.
     const slow = item.slow ? 14 : 0;
+    const tokens = 1400 + Math.floor(noise(index + 3) * 4200);
+    const tools = item.tools.map(([label, fn, request, text], toolIndex) => ({ section: 'tool', label, fn, request, text, short: label.toLowerCase(),
+      seconds: Number((0.3 + noise(index * 7 + fn.length + toolIndex)).toFixed(1)), ...(/^failed\b/.test(text) ? { error: true } : {}) }));
+    const thinking = Number((1.6 + noise(index + 11) * 4.5 + slow).toFixed(1));
+    const cost = Number((tokens * 0.000004 * (item.slow ? 6 : 1)).toFixed(4));
+    const steps = [{ section: 'reasoning', label: 'Reasoning', text: item.reason, seconds: thinking, cost }, ...tools];
     return {
       id, kind: item.kind ?? 'message', at: at(index), person: item.person ?? `${spec.personLabel} ${(index * 7) % 23 + 1}`, group: item.group ?? '',
       input: { label: item.kind && item.kind !== 'message' ? 'Trigger' : item.inputLabel ?? spec.inputLabels[item.role] ?? 'User', text: item.input },
       context: item.context ?? [], steps,
-      output: { label: 'Assistant', text: item.reply, detail: '' }, summary: item.summary ?? `${item.tools.map(([label]) => label).join(' → ') || 'No tools used'} → replied`,
-      metrics: { latency: Number((2 + noise(index + 11) * 5 + slow).toFixed(1)), tokens: 1400 + Math.floor(noise(index + 3) * 4200), steps: steps.length, replyChars: item.reply.length },
+      output: { label: 'Assistant', text: item.reply, detail: '' }, summary: item.summary ?? `${tools.map((step) => `${step.label}${step.error ? ' (failed)' : ''}`).join(' → ') || 'No tools used'} → replied`,
+      metrics: { latency: Number((thinking + tools.reduce((sum, step) => sum + step.seconds, 0)).toFixed(1)), tokens, cost, steps: steps.length, replyChars: item.reply.length },
       flags: item.flags ?? [], dims: { kind: item.kind ?? 'message', role: item.role, ...(item.dims ?? {}) }, meta: item.meta ?? null
     };
   });

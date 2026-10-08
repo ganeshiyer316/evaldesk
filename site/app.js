@@ -51,7 +51,18 @@ async function act(path, payload) {
 
 const traceUrl = (id) => `#/${domainId}/review/${encodeURIComponent(id)}`;
 const traceLink = (id) => `<a href="${esc(traceUrl(id))}" target="_blank" rel="noopener">${esc(id)}</a>`;
-const flagLabel = (flag) => (flag === 'slow' ? 'Slower than 90% of conversations' : data.domain.flags?.[flag] ?? flag.replaceAll('_', ' '));
+const BUILT_IN_FLAGS = { check_tool_failure: 'A tool failed and the reply doesn’t say so', check_numbers: 'A figure in the reply isn’t in any tool result or message',
+  slow: 'Much slower than usual', costly: 'Costs much more than usual' };
+const flagLabel = (flag) => BUILT_IN_FLAGS[flag] ?? data.domain.flags?.[flag] ?? flag.replaceAll('_', ' ');
+const money = (value) => `$${value < 0.01 ? value.toFixed(4).replace(/0+$/, '').replace(/\.$/, '') : value.toFixed(2)}`;
+// One plain sentence per tab, so nobody has to know the jargon to know what a page is for.
+const TAB_INTRO = {
+  patterns: 'Patterns are the recurring ways your product goes wrong (and right), built from your notes. Correct them until they read like something you’d say.',
+  grid: 'The grid shows which failure pattern applies to which conversation, and how common each one is.',
+  judges: 'A judge is an AI checker for one failure pattern. You measure it against your own labels before you trust it.',
+  tests: 'Test cases are conversations turned into checks you re-run after every change, so a fix stays fixed.',
+  trends: 'Trends shows whether each failure pattern is getting rarer, release by release.'
+};
 const notesFor = (id) => data.state.notes.filter((note) => note.traceId === id);
 const reviewed = (id) => Boolean(data.state.verdicts[id] || notesFor(id).length);
 
@@ -199,12 +210,20 @@ function noteCard(note) {
     <div class="tools"><a data-edit-note="${esc(note.id)}">Edit</a><a data-delete-note="${esc(note.id)}">Delete</a></div></div>`;
 }
 
-function block(kind, anchor, label, text, detail = '', request = '', fn = '') {
+// How long a step took and what it cost, as a bar against the whole conversation.
+function stepTiming(step) {
+  if (step.seconds == null && step.cost == null) return '';
+  return `<div class="timing">${step.share != null ? `<span class="tbar"><i style="width:${Math.max(2, Math.round(step.share * 100))}%"></i></span>` : ''}
+    ${[step.seconds != null && `${step.seconds} s`, step.cost != null && money(step.cost)].filter(Boolean).join(' · ')}
+    ${step.slowest ? '<span class="pill warn">Slowest step</span>' : ''}${step.costliest ? '<span class="pill warn">Most costly step</span>' : ''}</div>`;
+}
+
+function block(kind, anchor, label, text, detail = '', request = '', fn = '', step = null) {
   const notes = blockNotes.filter((note) => note.anchor === anchor);
   const writing = composer && composer.anchor === anchor;
   return `<div class="row">
-    <div class="block ${kind}" data-anchor="${esc(anchor)}"><button class="blocknote" data-note-anchor="${esc(anchor)}" data-note-label="${esc(label)}" title="Note on this whole part">💬</button>
-      <div class="label">${esc(label)}${fn ? ` <span class="fn" title="The function in the code that does this">(<code>${esc(fn)}</code>)</span>` : ''}</div>${request ? `<div class="req"><b>Asked:</b> ${esc(request)}</div><div class="got">Got:</div>` : ''}<div class="text">${markedText(text, notes)}</div>${detail ? `<div class="detail">${esc(detail)}</div>` : ''}</div>
+    <div class="block ${kind} ${step?.error ? 'failed' : ''}" data-anchor="${esc(anchor)}"><button class="blocknote" data-note-anchor="${esc(anchor)}" data-note-label="${esc(label)}" title="Note on this whole part">💬</button>
+      <div class="label">${esc(label)}${fn ? ` <span class="fn" title="The function in the code that does this">(<code>${esc(fn)}</code>)</span>` : ''}${step?.error ? ' <span class="pill fail">Failed</span>' : ''}</div>${request ? `<div class="req"><b>Asked:</b> ${esc(request)}</div><div class="got">Got:</div>` : ''}<div class="text">${markedText(text, notes)}</div>${detail ? `<div class="detail">${esc(detail)}</div>` : ''}${step ? stepTiming(step) : ''}</div>
     <div class="margin">${writing ? composerHtml(label) : ''}${notes.map(noteCard).join('')}</div></div>`;
 }
 
@@ -219,9 +238,9 @@ function rememberSections() {
   try { localStorage.setItem('evaldesk-open-sections', JSON.stringify(openSections)); } catch {}
 }
 
-function section(key, icon, title, gist, anchors, body) {
+function section(key, icon, title, gist, anchors, body, forceOpen = false) {
   const count = blockNotes.filter((note) => anchors.includes(note.anchor)).length;
-  const open = openSections[key] || (composer && anchors.includes(composer.anchor));
+  const open = forceOpen || openSections[key] || (composer && anchors.includes(composer.anchor));
   return `<details class="sec sec-${key}" data-section="${key}" ${open ? 'open' : ''}>
     <summary><span class="sec-title">${icon} ${esc(title)}</span>${gist ? `<span class="sec-gist">${esc(gist)}</span>` : ''}${count ? `<span class="sec-notes">💬 ${count}</span>` : ''}</summary>
     <div class="sec-body">${body}</div></details>`;
@@ -229,11 +248,15 @@ function section(key, icon, title, gist, anchors, body) {
 
 function conversationSections(trace) {
   const steps = (trace.steps ?? []).map((step, index) => ({ ...step, anchor: step.anchor ?? `step-${index}` }));
+  const totalSeconds = steps.reduce((sum, step) => sum + (step.seconds ?? 0), 0);
+  const top = (field) => { const having = steps.filter((step) => step[field] > 0); return having.length > 1 ? having.reduce((a, b) => (b[field] > a[field] ? b : a)) : null; };
+  const [slowest, costliest] = [top('seconds'), top('cost')];
+  for (const step of steps) Object.assign(step, { share: step.seconds != null && totalSeconds ? step.seconds / totalSeconds : null, slowest: step === slowest, costliest: step === costliest });
   const reasoning = steps.filter((step) => step.section === 'reasoning');
   const tools = steps.filter((step) => step.section !== 'reasoning');
   const voice = /voice/i.test(trace.input?.label ?? '');
   const clip = (text, n = 90) => { const flat = String(text ?? '').replace(/\s+/g, ' ').trim(); return flat.length > n ? `${flat.slice(0, n - 1)}…` : flat; };
-  const stepBlock = (step) => block('step', step.anchor, step.label, step.text, step.detail, step.request, step.fn);
+  const stepBlock = (step) => block('step', step.anchor, step.label, step.text, step.detail, step.request, step.fn, step);
   const user = section('user', proactive(trace) ? '⏰' : '👤', proactive(trace) ? 'Trigger' : `User${trace.person ? ` (${trace.person})` : ''}`,
     clip(`${trace.input?.label ?? ''}: ${trace.input?.text ?? ''}`), ['input', ...(trace.context ?? []).map((_, index) => `context-${index}`)],
     `${trace.context?.length ? `<details class="earlier"><summary>Earlier in the conversation (${trace.context.length})</summary>
@@ -242,8 +265,8 @@ function conversationSections(trace) {
     ${voice ? `<label class="voice"><input type="checkbox" id="transcription" ${data.state.transcription[trace.id] ? 'checked' : ''}> The transcript has a mistake (misheard name, time or word)</label>` : ''}`);
   const thinking = reasoning.length ? section('reasoning', '🧠', 'Reasoning: what it understood and decided', clip(reasoning.map((step) => step.text.split('\n')[0]).join(' → ')),
     reasoning.map((step) => step.anchor), reasoning.map(stepBlock).join('')) : '';
-  const toolCalls = tools.length ? section('tools', '🔧', `Tool calls (${tools.length}): what code did`, clip(tools.map((step) => step.short ?? step.label).join(' · ')),
-    tools.map((step) => step.anchor), tools.map(stepBlock).join('')) : '';
+  const toolCalls = tools.length ? section('tools', '🔧', `Tool calls (${tools.length}${tools.some((step) => step.error) ? `, ${tools.filter((step) => step.error).length} failed` : ''}): what code did`, clip(tools.map((step) => step.short ?? step.label).join(' · ')),
+    tools.map((step) => step.anchor), tools.map(stepBlock).join(''), tools.some((step) => step.error)) : '';
   const product = data.domain.labels?.product ?? 'Assistant';
   const assistant = section('assistant', '💬', proactive(trace) ? `${product} sent` : `Assistant (${product})`,
     [trace.metrics?.replyChars != null && `${trace.metrics.replyChars} characters`, trace.output?.detail].filter(Boolean).join(' · '), ['output'],
@@ -253,9 +276,12 @@ function conversationSections(trace) {
 
 function casePanel(trace) {
   blockNotes = trace ? notesFor(trace.id) : [];
-  if (!trace) return `<section class="panel case"><div class="empty">Pick a conversation on the left, or press <b>Review next</b>.</div></section>`;
+  if (!trace) return `<section class="panel case overview">${checksOverview()}<div class="empty">Pick a conversation in the list, or press <b>Review next</b>.</div></section>`;
   const m = trace.metrics ?? {};
-  const meta = [m.latency != null && `⏱ ${m.latency} s`, m.tokens ? `🔤 ${m.tokens.toLocaleString('en-US')} tokens` : null,
+  const failedSteps = (trace.steps ?? []).filter((step) => step.error);
+  const tools = (trace.steps ?? []).filter((step) => step.section !== 'reasoning');
+  const story = trace.summary || [tools.length ? `${tools.length} tool call${tools.length === 1 ? '' : 's'}` : 'No tools used', failedSteps.length && `${failedSteps.length} failed`, 'replied'].filter(Boolean).join(' → ');
+  const meta = [m.latency != null && `⏱ ${m.latency} s`, m.cost != null && `💵 ${money(m.cost)}`, m.tokens ? `🔤 ${m.tokens.toLocaleString('en-US')} tokens` : null,
     m.steps != null && `🧩 ${m.steps} steps`, m.replyChars != null && `✉️ ${m.replyChars} characters`, trace.person && `👤 ${trace.person}`, trace.group && `👥 ${trace.group}`]
     .filter(Boolean).map((item) => `<span>${esc(item)}</span>`).join('');
   return `<section class="panel case">
@@ -264,12 +290,36 @@ function casePanel(trace) {
       ${trace.release ? `<span class="tag kind-alt">${esc(trace.release)}</span>` : ''} <span class="small" style="font-size:13px;color:var(--muted);font-weight:400">${when(trace.at)}</span></h2>
     <div class="meta">${meta}</div>
     <div class="chips">${(trace.chips ?? []).map((chip) => `<span class="chip">${esc(chip.text)}</span>`).join('')}
-      ${(trace.flags ?? []).filter((flag) => flag !== 'slow').map((flag) => `<span class="chip flag">⚑ ${esc(flagLabel(flag))}</span>`).join('')}</div>
-    ${trace.summary ? `<div class="summary"><b>What happened:</b> ${esc(trace.summary)}</div>` : ''}
+      ${(trace.flags ?? []).filter((flag) => !BUILT_IN_FLAGS[flag]).map((flag) => `<span class="chip flag">⚑ ${esc(flagLabel(flag))}</span>`).join('')}</div>
+    <div class="summary"><b>What happened:</b> ${esc(story)}</div>
+    ${failedSteps.length ? `<div class="banner warn">⚠ ${failedSteps.length === 1 ? 'A tool failed' : `${failedSteps.length} tools failed`}: ${failedSteps.map((step) => `<b>${esc(step.label ?? step.fn ?? 'a tool')}</b>`).join(', ')}. Check whether the reply dealt with it.</div>` : ''}
+    ${checkPills(trace)}
     ${trace.meta ? `<div class="extra"><b>Extra metadata:</b> ${esc(typeof trace.meta === 'string' ? trace.meta : JSON.stringify(trace.meta))}</div>` : ''}
     <div class="secbar"><a data-sections="open">Open all</a> · <a data-sections="close">Close all</a></div>
     ${conversationSections(trace)}
   </section>`;
+}
+
+// The automatic checks on one conversation: rules that ran without any AI.
+function checkPills(trace) {
+  const checks = (trace.checks ?? []).filter((check) => check.result !== 'na');
+  if (!checks.length) return '';
+  const failed = checks.filter((check) => check.result === 'fail');
+  return `<div class="checks"><span class="checks-title" title="Plain rules that run on every conversation. No AI, nothing sent anywhere. A fail means: look at this one.">Automatic checks</span>
+    ${checks.map((check) => `<span class="pill ${check.result}" title="${esc(check.why)}">${check.result === 'pass' ? '✓' : '✕'} ${esc(check.name)}</span>`).join('')}
+    ${failed.map((check) => `<div class="check-why"><b>${esc(check.name)}:</b> ${esc(check.why)}</div>`).join('')}</div>`;
+}
+
+// Shown before a conversation is opened: what the automatic checks found across the whole file.
+function checksOverview() {
+  const rows = data.checkSummary ?? [];
+  const failed = rows.reduce((sum, row) => sum + row.failed, 0);
+  return `<h2>Automatic checks <span class="small" style="font-weight:400;color:var(--muted)">on all ${data.traces.length} conversations</span></h2>
+    <p class="small" style="color:var(--muted)">These are plain rules that ran the moment the file was loaded. No AI was used and nothing was sent anywhere. They are rules of thumb: a fail means “look at this one”, not a verdict. ${failed ? '' : 'Nothing failed.'}</p>
+    <table class="grid checks-table"><thead><tr><th class="left">Check</th><th>Failed</th><th>Passed</th><th>Doesn’t apply</th><th></th></tr></thead><tbody>
+    ${rows.map((row) => `<tr><td class="left"><b>${esc(row.name)}</b><div class="small" style="color:var(--muted)">${esc(row.about)}</div></td>
+      <td>${row.failed ? `<span class="pill fail">${row.failed}</span>` : '0'}</td><td>${row.passed}</td><td>${row.na}</td>
+      <td>${row.failed ? `<a data-do="show-flag" data-name="${esc(row.key)}">Show ${row.failed === 1 ? 'it' : 'them'}</a>` : ''}</td></tr>`).join('')}</tbody></table>`;
 }
 
 function sidePanel(trace) {
@@ -305,8 +355,9 @@ function starterPage() {
     : 'The file is read by this page and kept in this browser’s own storage. It is not uploaded anywhere.';
   return `<section class="panel starter" style="max-width:900px;margin:0 auto">
     <h2 style="margin-top:0">Find out where your AI product goes wrong, without writing code</h2>
+    <p>Your product’s logs are the <b>camera</b>: they show what happened. EvalDesk is the <b>referee</b>: it helps you decide whether it was any good.</p>
     <p>EvalDesk is a review desk for the people who know the subject. Read real conversations, comment on them like a Google Doc, and let the tool turn your notes into named failure patterns, AI checkers you can trust, and test cases to re-run after every change.</p>
-    <ol class="steps"><li><b>Review</b> conversations and write what went wrong.</li><li><b>Patterns</b>: your notes are grouped into failure patterns; you correct them.</li>
+    <ol class="steps"><li><b>Automatic checks</b> run the moment you load a file, with no AI: failed tools the reply ignored, figures that came from nowhere, slow or costly replies.</li><li><b>Review</b> conversations and write what went wrong.</li><li><b>Patterns</b>: your notes are grouped into failure patterns; you correct them.</li>
       <li><b>Judges</b> and <b>Test cases</b>: measure each pattern, and watch it drop in <b>Trends</b>.</li></ol>
     <div class="startrow">${pack.demo ? `<button class="primary" data-do="load-demo">Try the ${esc(pack.name)} demo</button>` : ''}
       <button class="${pack.demo ? '' : 'primary'}" data-do="load-traces">Load your own traces file</button></div>
@@ -512,6 +563,11 @@ function judgePanel(mode) {
   const counts = judge.counts;
   const run = judge.run;
   const devRun = version.results?.dev;
+  // What a run is likely to cost, from what this judge's earlier runs actually cost per conversation.
+  const paid = judge.versions.flatMap((item) => [item.dev, item.test]).filter((item) => item?.cost > 0 && item.count);
+  const perCall = paid.length ? paid.reduce((sum, item) => sum + item.cost, 0) / paid.reduce((sum, item) => sum + item.count, 0) : null;
+  judgePanel.perCall = perCall;
+  const price = (count) => (perCall ? `about ${money(perCall * count)}` : `${count} AI call${count === 1 ? '' : 's'}`);
   const traceIds = new Set(data.traces.map((trace) => trace.id));
   const wrong = (devRun?.rows ?? []).filter((row) => row.human && row.judge !== row.human);
   const versionRows = judge.versions.map((item, index) => {
@@ -553,6 +609,7 @@ function judgePanel(mode) {
       <button data-judge-run="test" data-judge-id="${esc(judge.id)}" data-v="${version.v}" ${run?.running || judge.final ? 'disabled' : ''}>${judge.final ? `Final test used (v${judge.final.v})` : `Run the final test on v${version.v} (once)`}</button>
       <button data-judge-run="all" data-judge-id="${esc(judge.id)}" data-v="${version.v}" ${run?.running ? 'disabled' : ''}>Run on all ${data.traces.length} conversations</button>
     </div>
+    <p class="small">What a run costs on your OpenRouter key: tuning set ${price(counts.dev.fail + counts.dev.pass)} · final test ${price(counts.test.fail + counts.test.pass)} · all conversations ${price(data.traces.length)}${perCall ? ', going by this judge’s earlier runs' : '. Each call is one conversation, usually a fraction of a cent'}.</p>
     ${scorecard(version.dev, 'Tuning set')}
     ${scorecard(version.test, 'Final test (held out)')}
     ${version.all ? `<div class="banner">Judge's estimate: <b>${pct(version.all.failRate)}</b> of ${version.all.count} conversations have this problem (v${version.v}, ${ago(version.all.at)}). Trust it as far as the final test says.</div>` : ''}
@@ -626,7 +683,7 @@ function render() {
   const main = $('#main');
   const notice = backend.persistent ? '' : '<div class="banner warn"><b>This browser is blocking storage</b> (private window?), so your work will be lost when you close the tab. Use <b>Data → Download a backup</b> before you leave.</div>';
   try {
-    main.innerHTML = notice + (view === 'patterns' ? renderPatterns() : view === 'judges' ? renderJudges() : view === 'grid' ? renderGrid() : view === 'trends' ? renderTrends() : view === 'tests' ? renderTests() : renderReview());
+    main.innerHTML = notice + (TAB_INTRO[view] && data.traces.length ? `<p class="tab-intro">${TAB_INTRO[view]}</p>` : '') + (view === 'patterns' ? renderPatterns() : view === 'judges' ? renderJudges() : view === 'grid' ? renderGrid() : view === 'trends' ? renderTrends() : view === 'tests' ? renderTests() : renderReview());
   } catch (error) {
     console.error(error);
     main.innerHTML = `<div class="empty">This page hit an error: ${esc(error.message)}. Refresh the page; if it keeps happening, please report it with a screenshot of this message.</div>`;
@@ -717,7 +774,7 @@ document.addEventListener('click', async (event) => {
   if (t.dataset.judgeVersion) { judgeVersion[t.dataset.judgeId] = Number(t.dataset.judgeVersion); return render(); }
   if (t.dataset.judgeRun) {
     if (t.dataset.judgeRun === 'test' && !window.confirm('The final test can only be run once, on the version you trust most. Running it again would make it just another tuning set. Run it now on this version?')) return;
-    if (t.dataset.judgeRun === 'all' && !window.confirm(`Run this judge on all ${data.traces.length} conversations? It makes one AI call per conversation (a few cents in total).`)) return;
+    if (t.dataset.judgeRun === 'all' && !window.confirm(`Run this judge on all ${data.traces.length} conversations? It makes one AI call per conversation${judgePanel.perCall ? `, about ${money(judgePanel.perCall * data.traces.length)} in total` : ' (usually a few cents in total)'}.`)) return;
     return act('judge-run', { judgeId: t.dataset.judgeId, v: Number(t.dataset.v), set: t.dataset.judgeRun });
   }
   if (t.dataset.judgeImprove) { judgeVersion[t.dataset.judgeImprove] = undefined; return act('judge-improve', { judgeId: t.dataset.judgeImprove, v: Number(t.dataset.v) }); }
@@ -982,6 +1039,11 @@ async function doAction(t) {
   const name = t.dataset.do;
   if (name === 'close-dialog') return $('#dialog').close();
   if (name === 'step') return move(Number(t.dataset.step));
+  if (name === 'show-flag') {
+    Object.assign(filters, { search: '', show: 'all', kind: 'all', flag: t.dataset.name, dims: {} });
+    const first = filtered()[0];
+    return first ? setHash('review', first.id) : render();
+  }
   if (name === 'back-to-list') { currentId = null; composer = null; return setHash('review'); }
   if (name === 'open-data') return dataDialog();
   if (name === 'open-settings') return settingsDialog();

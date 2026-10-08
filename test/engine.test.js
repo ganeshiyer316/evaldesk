@@ -58,6 +58,10 @@ test('the demo loads as a backup, fills every tab, and comes back out the same',
   assert.equal(data.handling['pending-as-done'].choice, 'code_check');
   assert.equal(data.judges[0].versions[1].dev.score.catches.rate, 1);
   assert.ok(data.saturation.likelySaturated);
+  const unreviewed = data.traces.find((trace) => trace.id === 'pay-030');
+  assert.deepEqual(unreviewed.checks.filter((check) => check.result === 'fail').map((check) => check.key), ['check_tool_failure', 'check_numbers'], 'the checks catch a bad reply nobody has reviewed yet');
+  assert.ok(unreviewed.flags.includes('check_numbers') && unreviewed.steps.some((step) => step.error));
+  assert.equal(data.checkSummary.find((row) => row.key === 'check_tool_failure').failed, 1);
   const [type, text] = await engine.exportFile('payments', 'backup.json');
   assert.equal(type, 'application/json');
   assert.deepEqual(JSON.parse(text).state, demo.state);

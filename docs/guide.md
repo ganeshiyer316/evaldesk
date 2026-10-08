@@ -10,6 +10,18 @@ EvalDesk is for reviewing your AI product's conversations. You write notes on wh
 
 Your work is saved as you go. On the hosted page it lives in your browser, so use **Data → Download a backup** now and then. Clearing your browser's site data deletes it.
 
+## Automatic checks: what you get before you do anything
+
+The moment a file is loaded, EvalDesk runs a few plain rules on every conversation. No AI is used, no key is needed, and nothing is sent anywhere. The Review tab opens on a table of what they found, and **Show them** takes you to the conversations that failed.
+
+- **Tool failures handled:** a tool call failed, and the reply carries on as if it worked.
+- **Figures come from a source:** an amount, percentage, time or long number in the reply doesn't appear in any tool result or in anything the user said. Small everyday numbers ("5 to 10 days") are ignored.
+- **Speed** and **Cost:** the conversation is among the slowest or costliest tenth *and* at least twice the typical one.
+
+Each conversation shows its results as ✓ and ✕ pills under the summary, with the reason for any fail. A failed check also counts as a ⚑ warning, so you can filter by it, and the Patterns and Judges tabs will tell you when a check already catches one of your failure patterns.
+
+These are rules of thumb. A fail means "look at this one", not "this is wrong": your verdict is the one that counts.
+
 ## The six tabs
 
 **Review: read and note**
@@ -21,7 +33,7 @@ Your work is saved as you go. On the hosted page it lives in your browser, so us
     - *random*;
     - *next in this list*: works through your current filter, e.g. all merchant questions.
 - **Middle:** the conversation, as the user saw it.
-  - **What happened:** a one-line summary.
+  - **What happened:** a one-line summary. Each step shows how long it took and what it cost when your traces include that; the slowest and most costly steps are marked, and a failed tool call is shown in red.
   - **Chips:** outliers (slower than 90% of conversations) and warnings, e.g. "Says done, but the record says otherwise".
   - Then the conversation in four parts. Click a part's title to open or close it; the page remembers your choice for the next conversation (**Open all · Close all** at the top). A closed part shows a one-line gist, and 💬 with a number if it has comments.
     - 👤 **User:** the user's message (earlier messages tucked inside).

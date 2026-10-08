@@ -23,6 +23,8 @@ Done:
 - Shared engine (`site/core/engine.js`) that runs in the browser (IndexedDB) and behind the optional local server (files). `site/backend.js` picks one.
 - All six tabs working in the browser with no server: Review, Patterns, Grid, Judges, Test cases, Trends.
 - New for the standalone tool: load a traces file, add traces, backup and restore, delete; Settings (OpenRouter key in the browser, models); "see what is sent" preview and log; releases added by hand, from a `release` field on traces, or from git tags in local mode; filters built from whatever tags the traces carry; a General pack.
+- Automatic checks (`site/core/checks.js`): four rules that run on every trace with no AI (failed tool ignored, figures not from a source, speed, cost). Results show as pills on each conversation and as a table when the Review tab opens; a failed check is also a warning flag. Steps can carry `seconds`, `cost` and `error`.
+- A plain one-line explanation under each tab, and the likely cost of a judge run shown before running it (worked out from that judge's earlier runs).
 - Demo data: 40 fictional conversations each for Payments and Healthcare, part-reviewed (`scripts/demo/*.mjs` → `npm run demo` → `site/demo/*.json`).
 - 33 tests passing (`npm test`).
 - Checked by hand in a browser with the Payments demo: every tab renders, dialogs open, a verdict survives a reload. Local mode checked through its API with the Healthcare demo.
@@ -31,6 +33,7 @@ Done:
 
 - **Not tried with a real OpenRouter key.** Grouping and judges are covered by tests with a fake model, and worked in the tool this was extracted from, but nobody has run them from a browser against OpenRouter yet. Ganesh should add a key in Settings and try "Group my notes now" and one judge run on the demo.
 - **Decisions for Ganesh:** whether the README should keep crediting the evals course by name.
+- The automatic checks are rules of thumb and will give some false alarms on real data (for example a correct figure the product knew from somewhere not in the trace). They have only been run on the demo data so far. Worth trying on a real traces file and tuning.
 - The judge results inside the demo are sample numbers, labelled as such in the version note. With only one failing example in the tuning set they show a wide "likely range", which is honest but thin.
 - Phones: there is a phone layout (one column, each conversation on its own screen, tabs scroll sideways), checked at phone size in a desktop browser. **Not tried on a real phone**, in particular selecting words to comment by touch.
 - README screenshots are in `docs/images/`. Retake them from the Payments demo (`?demo=payments`) if the page changes much.
