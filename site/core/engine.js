@@ -12,7 +12,7 @@ import { sentLog } from './openrouter.js';
 import { checkSummary, withChecks } from './checks.js';
 
 export const BUNDLE_VERSION = 1;
-const DOCS = ['traces', 'state', 'patterns', 'judges', 'tests', 'releases', 'profile'];
+const DOCS = ['traces', 'state', 'patterns', 'judges', 'tests', 'releases', 'profile', 'pack'];
 const emptyState = () => ({ verdicts: {}, notes: [], transcription: {}, grid: {} });
 
 // Fills in anything an imported trace leaves out, so any product's data can be loaded.
@@ -24,6 +24,48 @@ export function normalizeTrace(item, index) {
     summary: item.summary ?? '', metrics: item.metrics ?? {}, flags: item.flags ?? [], dims: item.dims ?? { kind: item.kind ?? 'message' },
     meta: item.meta ?? null, ...(item.release ? { release: String(item.release) } : {})
   };
+}
+
+// A label pack loaded from the page: the reviewer's own names for their product, its warning
+// flags and kinds of conversation, and a starter checklist. It is laid over the built-in pack
+// for that domain. Only known fields of the right shape are kept; everything else is dropped.
+const text = (value, max) => (typeof value === 'string' && value.trim() ? value.trim().slice(0, max) : undefined);
+const textMap = (value, max = 200) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const entries = Object.entries(value).filter(([, label]) => typeof label === 'string' && label.trim()).slice(0, 200).map(([key, label]) => [key, label.trim().slice(0, max)]);
+  return entries.length ? Object.fromEntries(entries) : undefined;
+};
+const textList = (value, max = 200) => {
+  if (!Array.isArray(value)) return undefined;
+  const list = value.filter((item) => typeof item === 'string' && item.trim()).slice(0, 100).map((item) => item.trim().slice(0, max));
+  return list.length ? list : undefined;
+};
+
+export function checkPack(value) {
+  const example = 'It should look like { "name": "My product", "flags": { "flag_name": "A readable label" } }.';
+  if (Array.isArray(value) && value.length && value[0]?.id != null && value[0]?.input != null) throw new Error('This looks like a traces file, not a label pack. Use “Load a traces file” for it.');
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`This file is not a label pack. ${example}`);
+  const modes = Array.isArray(value.starterFailureModes)
+    ? value.starterFailureModes.filter((mode) => text(mode?.name, 80)).slice(0, 30).map((mode) => ({ name: text(mode.name, 80), definition: text(mode.definition, 400) ?? '', boundaries: text(mode.boundaries, 400) ?? '' }))
+    : [];
+  const dimensions = value.dimensions && typeof value.dimensions === 'object' && !Array.isArray(value.dimensions)
+    ? Object.fromEntries(Object.entries(value.dimensions).map(([key, list]) => [key, textList(list, 80)]).filter(([, list]) => list).slice(0, 20))
+    : {};
+  const expected = value.testExpected && typeof value.testExpected === 'object' && !Array.isArray(value.testExpected)
+    ? Object.fromEntries(Object.entries(value.testExpected).map(([key, item]) => [key, typeof item === 'string' ? text(item, 300) : textList(item, 80)]).filter(([, item]) => item).slice(0, 20))
+    : {};
+  const pack = {
+    name: text(value.name, 60), description: text(value.description, 600), labels: textMap(value.labels, 40),
+    reviewGoal: Number.isFinite(value.reviewGoal) && value.reviewGoal > 0 ? Math.round(value.reviewGoal) : undefined,
+    starterFailureModes: modes.length ? modes : undefined, goodPatternHints: textList(value.goodPatternHints),
+    dimensions: Object.keys(dimensions).length ? dimensions : undefined,
+    flags: textMap(value.flags), kinds: textMap(value.kinds, 60),
+    proactiveKinds: textList(value.proactiveKinds, 60), codeFaultFlags: textList(value.codeFaultFlags, 60),
+    testExpected: Object.keys(expected).length ? expected : undefined
+  };
+  const kept = Object.fromEntries(Object.entries(pack).filter(([, item]) => item !== undefined));
+  if (!Object.keys(kept).length) throw new Error(`This file has nothing a label pack can use. ${example}`);
+  return kept;
 }
 
 // Checks a traces file before it is saved, and explains what is wrong in plain words.
@@ -69,14 +111,16 @@ export function createEngine({ store, packs, settings, linkBase = '', extraRelea
   };
 
   async function load(domainId) {
-    const [rawTraces, state, patterns, judges, tests, releases, profile] = await Promise.all(DOCS.map((name) => store.get(domainId, name)));
+    const [rawTraces, state, patterns, judges, tests, releases, profile, ownPack] = await Promise.all(DOCS.map((name) => store.get(domainId, name)));
+    // The reviewer's own label pack, if they loaded one, laid over the built-in pack.
+    const base = { ...pack(domainId), ...(ownPack ?? {}), ownPack: Boolean(ownPack) };
     const traces = withChecks(withOutlierChips((rawTraces ?? []).map(normalizeTrace)));
     const description = String(profile?.description ?? '').trim();
     return {
       traces, state: { ...emptyState(), ...(state ?? {}) }, patterns: { ...emptyPatterns(), ...(patterns ?? {}) },
       judges: { ...emptyJudges(), ...(judges ?? {}) }, tests: { ...emptyTests(), ...(tests ?? {}) },
       releases: normalizeReleases([...(releases ?? []), ...(await extraReleases()), ...releasesFromTraces(traces)]), manualReleases: normalizeReleases(releases ?? []),
-      profile: { description }, domain: { ...pack(domainId), ...(description ? { description, packDescription: pack(domainId).description } : {}) }
+      profile: { description }, domain: { ...base, ...(description ? { description, packDescription: base.description } : {}) }
     };
   }
 
@@ -391,6 +435,7 @@ export function createEngine({ store, packs, settings, linkBase = '', extraRelea
         const data = input.bundle;
         if (!data || data.evaldesk !== BUNDLE_VERSION) throw new Error('This is not an EvalDesk backup file.');
         if (data.traces) checkTraces(data.traces);
+        if (data.pack != null) data.pack = checkPack(data.pack);
         for (const doc of DOCS) {
           if (data[doc] != null) await store.set(domainId, doc, data[doc]);
           else await store.set(domainId, doc, null);
@@ -399,6 +444,9 @@ export function createEngine({ store, packs, settings, linkBase = '', extraRelea
         await store.set(domainId, 'releases', normalizeReleases(input.releases));
       } else if (name === 'profile') {
         await store.set(domainId, 'profile', { description: String(input.description ?? '').trim().slice(0, 600) });
+      } else if (name === 'pack') {
+        // Notes, labels and traces are untouched: a pack only changes names and the starter checklist.
+        await store.set(domainId, 'pack', input.pack == null ? null : checkPack(input.pack));
       } else if (name === 'clear') {
         await store.remove(domainId);
       } else {
@@ -427,7 +475,7 @@ export function createEngine({ store, packs, settings, linkBase = '', extraRelea
 
   async function listDomains() {
     const list = [];
-    for (const item of domains.values()) list.push({ id: item.id, name: item.name, group: item.group, traces: ((await store.get(item.id, 'traces')) ?? []).length });
+    for (const item of domains.values()) list.push({ id: item.id, name: (await store.get(item.id, 'pack'))?.name ?? item.name, group: item.group, traces: ((await store.get(item.id, 'traces')) ?? []).length });
     return list;
   }
 

@@ -327,14 +327,19 @@ function checkPills(trace) {
 
 // Shown before a conversation is opened: what the automatic checks found across the whole file.
 function checksOverview() {
-  const rows = data.checkSummary ?? [];
+  // A check that applies to no conversation in this file is left out of the table and named underneath.
+  const all = data.checkSummary ?? [];
+  const rows = all.filter((row) => row.failed + row.passed > 0);
+  const idle = all.filter((row) => row.failed + row.passed === 0);
   const failed = rows.reduce((sum, row) => sum + row.failed, 0);
+  const idleNote = idle.length ? `<p class="small" style="color:var(--muted)">${rows.length ? 'Not shown' : 'None of the checks apply to this file'}: ${idle.map((row) => `<b>${esc(row.name)}</b> (${esc(row.idle ?? 'nothing to check')})`).join('; ')}. See the <a href="https://github.com/ganeshiyer316/evaldesk/blob/main/docs/trace-format.md" target="_blank" rel="noopener">trace format</a> for the fields each check reads.</p>` : '';
+  if (!rows.length) return `<h2>Automatic checks <span class="small" style="font-weight:400;color:var(--muted)">on all ${data.traces.length} conversations</span></h2>${idleNote}`;
   return `<h2>Automatic checks <span class="small" style="font-weight:400;color:var(--muted)">on all ${data.traces.length} conversations</span></h2>
     <p class="small" style="color:var(--muted)">These are plain rules that ran the moment the file was loaded. No AI was used and nothing was sent anywhere. They are rules of thumb: a fail means “look at this one”, not a verdict. ${failed ? '' : 'Nothing failed.'}</p>
     <table class="grid checks-table"><thead><tr><th class="left">Check</th><th>Failed</th><th>Passed</th><th>Doesn’t apply</th><th></th></tr></thead><tbody>
     ${rows.map((row) => `<tr><td class="left"><b>${esc(row.name)}</b><div class="small" style="color:var(--muted)">${esc(row.about)}</div></td>
       <td>${row.failed ? `<span class="pill fail">${row.failed}</span>` : '0'}</td><td>${row.passed}</td><td>${row.na}</td>
-      <td>${row.failed ? `<a data-do="show-flag" data-name="${esc(row.key)}">Show ${row.failed === 1 ? 'it' : 'them'}</a>` : ''}</td></tr>`).join('')}</tbody></table>`;
+      <td>${row.failed ? `<a data-do="show-flag" data-name="${esc(row.key)}">Show ${row.failed === 1 ? 'it' : 'them'}</a>` : ''}</td></tr>`).join('')}</tbody></table>${idleNote}`;
 }
 
 function sidePanel(trace) {
@@ -1005,6 +1010,9 @@ function dataDialog() {
     <div class="acts"><button data-do="load-traces">Load a traces file (replace)</button><button data-do="add-traces">Add more traces</button>
       ${data.domain.demo ? '<button data-do="load-demo">Load the demo</button>' : ''}</div>
     <p class="small">Your notes and labels are kept when you load a newer file, as long as each conversation keeps the same id. Remove names and personal details before loading.</p>
+    <h3>Your own labels</h3>
+    <div class="acts"><button data-do="load-pack">Load a label pack</button>${data.domain.ownPack ? '<button data-do="remove-pack">Remove it</button>' : ''}</div>
+    <p class="small">${data.domain.ownPack ? `Using your label pack${data.domain.name ? ` “${esc(data.domain.name)}”` : ''}. ` : ''}A label pack is a small file that gives this domain your product’s name, readable names for your warning flags and kinds of conversation, and your own starter checklist. It changes names only: your traces, notes and labels are untouched. <a href="https://github.com/ganeshiyer316/evaldesk/blob/main/docs/label-pack.md" target="_blank" rel="noopener">What goes in it</a>.</p>
     <h3>Backup</h3>
     <div class="acts"><button data-do="export" data-name="backup.json">Download a backup</button><button data-do="restore">Restore from a backup</button></div>
     <p class="small">A backup is one file with the traces, your notes, patterns, judges and test cases for this domain. Use it to move to another browser or share your review with a colleague.</p>
@@ -1074,6 +1082,16 @@ async function doAction(t) {
     if (!traces) return;
     data = await backend.act(domainId, 'import-traces', { traces, mode: name === 'add-traces' ? 'add' : 'replace' });
     return reloaded(`${data.traces.length} conversations loaded.`);
+  }
+  if (name === 'load-pack') {
+    const pack = await pickJsonFile();
+    if (!pack) return;
+    data = await backend.act(domainId, 'pack', { pack });
+    return reloaded(`Label pack loaded${data.domain.name ? `: ${data.domain.name}` : ''}.`);
+  }
+  if (name === 'remove-pack') {
+    data = await backend.act(domainId, 'pack', { pack: null });
+    return reloaded('Label pack removed. Your traces, notes and labels are unchanged.');
   }
   if (name === 'load-demo') {
     if (hasWork() && !window.confirm(`Loading the demo replaces the traces, notes and results you have for ${data.domain.name}. Continue?`)) return;

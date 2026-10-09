@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { checkTraces, createEngine, memoryStore } from '../site/core/engine.js';
+import { checkPack, checkTraces, createEngine, memoryStore } from '../site/core/engine.js';
 import { sentLog } from '../site/core/openrouter.js';
 import { sha256Hex } from '../site/core/sha256.js';
 import { normalizeReleases, releasesFromTraces } from '../site/core/stats.js';
@@ -129,6 +129,33 @@ test('grouping and judges use the saved key, send only to zero-data-retention pr
   const { log } = await engine.query('general', 'sent-log');
   assert.ok(log.length >= 13 && log.every((item) => !JSON.stringify(item).includes('test-key')), 'the log shows requests, never the key');
   assert.equal(sentLog()[0].body.model, 'deepseek/deepseek-v4.1-flash');
+});
+
+test('a label pack gives a domain the reviewer’s own names without touching their work', async () => {
+  assert.throws(() => checkPack([1, 2]), /not a label pack/);
+  assert.throws(() => checkPack(traces(2)), /looks like a traces file/);
+  assert.throws(() => checkPack({ hello: 1, flags: { a: 3 } }), /nothing a label pack can use/);
+  assert.deepEqual(checkPack({ id: 'x', order: 1, demo: true, name: ' Shop help ', flags: { late_reply: 'Replied late', bad: 7 }, kinds: { alert: 'Alert we sent' }, starterFailureModes: [{ name: 'Wrong order' }, { definition: 'no name' }] }),
+    { name: 'Shop help', starterFailureModes: [{ name: 'Wrong order', definition: '', boundaries: '' }], flags: { late_reply: 'Replied late' }, kinds: { alert: 'Alert we sent' } }, 'unknown fields and wrong shapes are dropped');
+
+  const engine = engineWith();
+  let data = await engine.action('general', 'import-traces', { traces: traces(3) });
+  data = await engine.action('general', 'verdict', { traceId: 't-1', verdict: 'bad' });
+  assert.equal(data.domain.ownPack, false);
+  data = await engine.action('general', 'pack', { pack: { name: 'Shop help', description: 'Answers shoppers.', flags: { late_reply: 'Replied late' } } });
+  assert.deepEqual([data.domain.name, data.domain.flags.late_reply, data.domain.ownPack, data.domain.id], ['Shop help', 'Replied late', true, 'general']);
+  assert.ok(data.domain.starterFailureModes.length > 3, 'fields the pack leaves out still come from the built-in pack');
+  assert.equal(data.reviewed, 1, 'the review is untouched');
+  assert.equal((await engine.listDomains()).find((item) => item.id === 'general').name, 'Shop help');
+  await assert.rejects(engine.action('general', 'pack', { pack: 'nope' }), /not a label pack/);
+
+  // It travels in a backup, and removing it brings the built-in names back.
+  const backup = JSON.parse((await engine.exportFile('general', 'backup.json'))[1]);
+  assert.equal(backup.pack.name, 'Shop help');
+  const other = engineWith();
+  assert.equal((await other.action('general', 'restore', { bundle: backup })).domain.name, 'Shop help');
+  data = await engine.action('general', 'pack', { pack: null });
+  assert.deepEqual([data.domain.name, data.domain.ownPack, data.reviewed], ['General', false, 1]);
 });
 
 test('nothing from the private product this tool grew out of is in the repository', async () => {

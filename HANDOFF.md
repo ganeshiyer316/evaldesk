@@ -18,8 +18,10 @@ EvalDesk: an open-source review desk that lets subject-matter experts review an 
 
 - The conversation list can be sorted newest or oldest first (menu above the list, remembered in the browser).
 - Tried the automatic checks on a real file of 253 conversations whose tool steps record only a one-line summary of each result. "Figures come from a source" failed 131 of them, all false alarms. It now stands aside ("doesn't apply") when a tool worked but nothing recorded for any tool contains a figure. A figure with no working tool behind it still fails, so both demos give the same results as before.
-- On that file "Tool failures handled" and "Cost" apply to nothing, because its steps carry no `error` and its traces no cost. That is correct, but the table then shows two rows of "doesn't apply". Open question: hide checks that apply to nothing.
-- 34 tests passing.
+- A check that applies to no conversation in the file is left out of the checks table and named underneath with the reason (for example "no cost is recorded").
+- **Label packs from the page** (Data → Load a label pack; fields in `docs/label-pack.md`): a reviewer's own product name, readable names for warning flags and kinds, and a starter checklist, laid over the built-in pack for that domain. Stored with the rest of the domain's work (a new `pack` document), included in backups, removable. `checkPack` in `site/core/engine.js` keeps only known fields of the right shape.
+- 35 tests passing. Checked in a browser with made-up data: sort, the shorter checks table, a loaded pack renaming the domain, its flags and its kinds.
+- Open: a loaded pack renames one of the three built-in domains; there is still no way to add a fourth domain from the page.
 
 ## State on 2026-10-07
 
@@ -44,7 +46,6 @@ Done:
 - The judge results inside the demo are sample numbers, labelled as such in the version note. With only one failing example in the tuning set they show a wide "likely range", which is honest but thin.
 - Phones: there is a phone layout (one column, each conversation on its own screen, tabs scroll sideways), checked at phone size in a desktop browser. **Not tried on a real phone**, in particular selecting words to comment by touch.
 - README screenshots are in `docs/images/`. Retake them from the Payments demo (`?demo=payments`) if the page changes much.
-- A custom pack needs a file in `site/packs/` and its name in `site/backend.js`. There is no way to add one from the page yet.
 
 ## Parked ideas
 

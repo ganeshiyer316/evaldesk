@@ -6,11 +6,11 @@
 
 export const CHECKS = {
   check_tool_failure: { name: 'Tool failures handled', flag: 'A tool failed and the reply doesn’t say so',
-    about: 'When a tool call fails, the reply should say so or the tool should be tried again.' },
+    about: 'When a tool call fails, the reply should say so or the tool should be tried again.', idle: 'no tool step in this file is marked as failed' },
   check_numbers: { name: 'Figures come from a source', flag: 'A figure in the reply isn’t in any tool result or message',
-    about: 'Amounts, percentages, times and long numbers in the reply should appear in a tool result or in what the user said.' },
-  slow: { name: 'Speed', flag: 'Much slower than usual', about: 'Fails when a conversation is among the slowest tenth and took at least twice the typical time.' },
-  costly: { name: 'Cost', flag: 'Costs much more than usual', about: 'Fails when a conversation is among the costliest tenth and cost at least twice the typical amount.' }
+    about: 'Amounts, percentages, times and long numbers in the reply should appear in a tool result or in what the user said.', idle: 'no reply has a figure that can be checked against a recorded tool result' },
+  slow: { name: 'Speed', flag: 'Much slower than usual', about: 'Fails when a conversation is among the slowest tenth and took at least twice the typical time.', idle: 'no timing is recorded' },
+  costly: { name: 'Cost', flag: 'Costs much more than usual', about: 'Fails when a conversation is among the costliest tenth and cost at least twice the typical amount.', idle: 'no cost is recorded' }
 };
 
 // Words that show a reply owned up to something not working.
@@ -109,6 +109,6 @@ export function checkSummary(traces) {
   return Object.entries(CHECKS).map(([key, check]) => {
     const results = traces.map((trace) => (trace.checks ?? []).find((item) => item.key === key)?.result ?? 'na');
     const count = (value) => results.filter((item) => item === value).length;
-    return { key, name: check.name, about: check.about, passed: count('pass'), failed: count('fail'), na: count('na') };
+    return { key, name: check.name, about: check.about, idle: check.idle, passed: count('pass'), failed: count('fail'), na: count('na') };
   });
 }

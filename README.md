@@ -77,7 +77,7 @@ Both use the same code. Use **Data → Download a backup** to move a review betw
 
 ## Domain packs
 
-A pack is one JSON file in `site/packs/` with a description of the kind of product, a starter checklist of common failure modes, and labels for warning flags. Payments, Healthcare and General are included. To add your own, copy one and add its name to the list at the top of `site/backend.js`.
+A pack gives a domain a description of the kind of product, a starter checklist of common failure modes, and labels for warning flags. Payments, Healthcare and General are built in. To use your own names, load a label pack from **Data → Load a label pack**; the fields are in [docs/label-pack.md](docs/label-pack.md). To add a built-in pack, put a file in `site/packs/` and add its name to the list at the top of `site/backend.js`.
 
 ## Development
 
