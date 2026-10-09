@@ -21,6 +21,7 @@ EvalDesk: an open-source review desk that lets subject-matter experts review an 
 - A check that applies to no conversation in the file is left out of the checks table and named underneath with the reason (for example "no cost is recorded").
 - **Label packs from the page** (Data → Load a label pack; fields in `docs/label-pack.md`): a reviewer's own product name, readable names for warning flags and kinds, and a starter checklist, laid over the built-in pack for that domain. Stored with the rest of the domain's work (a new `pack` document), included in backups, removable. `checkPack` in `site/core/engine.js` keeps only known fields of the right shape.
 - 35 tests passing. Checked in a browser with made-up data: sort, the shorter checks table, a loaded pack renaming the domain, its flags and its kinds.
+- Earlier turns are labelled "Earlier message · who" (with the time when a turn has `at`) and the input "This message · …" when there are earlier turns. A first-time reviewer had read an earlier turn as part of the message being judged.
 - Open: a loaded pack renames one of the three built-in domains; there is still no way to add a fourth domain from the page.
 
 ## State on 2026-10-07

@@ -275,8 +275,8 @@ function conversationSections(trace) {
   const user = section('user', proactive(trace) ? '⏰' : '👤', proactive(trace) ? 'Trigger' : `User${trace.person ? ` (${trace.person})` : ''}`,
     clip(`${trace.input?.label ?? ''}: ${trace.input?.text ?? ''}`), ['input', ...(trace.context ?? []).map((_, index) => `context-${index}`)],
     `${trace.context?.length ? `<details class="earlier"><summary>Earlier in the conversation (${trace.context.length})</summary>
-      ${trace.context.map((turn, index) => block('context', `context-${index}`, turn.who, turn.text)).join('')}</details>` : ''}
-    ${block('input', 'input', trace.input?.label ?? 'Input', trace.input?.text ?? '')}
+      ${trace.context.map((turn, index) => block('context', `context-${index}`, `Earlier message${turn.who ? ` · ${turn.who}` : ''}${turn.at ? ` · ${when(turn.at)}` : ''}`, turn.text)).join('')}</details>` : ''}
+    ${block('input', 'input', `${trace.context?.length && !proactive(trace) ? 'This message · ' : ''}${trace.input?.label ?? 'Input'}`, trace.input?.text ?? '')}
     ${voice ? `<label class="voice"><input type="checkbox" id="transcription" ${data.state.transcription[trace.id] ? 'checked' : ''}> The transcript has a mistake (misheard name, time or word)</label>` : ''}`);
   const thinking = reasoning.length ? section('reasoning', '🧠', 'Reasoning: what it understood and decided', clip(reasoning.map((step) => step.text.split('\n')[0]).join(' → ')),
     reasoning.map((step) => step.anchor), reasoning.map(stepBlock).join('')) : '';

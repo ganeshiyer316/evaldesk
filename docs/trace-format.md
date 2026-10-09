@@ -33,7 +33,7 @@ Only `id`, `input` and `output` are required.
 |---|---|
 | `id` | **Must stay the same every time you export**, or your notes come loose from their conversations. |
 | `input`, `output` | What the user asked and what the product replied. Each is `{ label, text }`, or just a string. |
-| `context` | Earlier turns, shown folded above the input. |
+| `context` | Earlier turns, shown folded above the input and labelled "Earlier message". Each has `who` and `text`; add `at` to show when it was sent. The input is then labelled "This message". |
 | `steps` | What happened in between. `section` is `"reasoning"` or `"tool"` (the default). A tool step can show what it was asked (`request`) and what it returned (`text`). `fn` is the function name, shown in brackets. `short` is the one-line version shown when the section is closed. Optional on any step: `seconds` (how long it took), `cost` (in US dollars) and `error` (`true` when the step failed). With these, the page marks the slowest and most costly step, shows a failed step in red, and can check whether the reply dealt with the failure. |
 | `kind` | The type of interaction, e.g. `message` or `alert`. Used for filters and for comparing like with like. |
 | `at` | When it happened (ISO date). Used for ordering and for Trends. |
