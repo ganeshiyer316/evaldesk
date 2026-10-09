@@ -14,6 +14,13 @@ EvalDesk: an open-source review desk that lets subject-matter experts review an 
 4. **Never ask for API keys in chat.** Keys go in `.env` (local mode) or in the visitor's own browser (Settings).
 5. **AI calls go only to zero-data-retention providers** (`site/core/openrouter.js` is the only place that calls a model), and the user can see exactly what is sent (preview and log).
 
+## 2026-10-09: first run on a real traces file
+
+- The conversation list can be sorted newest or oldest first (menu above the list, remembered in the browser).
+- Tried the automatic checks on a real file of 253 conversations whose tool steps record only a one-line summary of each result. "Figures come from a source" failed 131 of them, all false alarms. It now stands aside ("doesn't apply") when a tool worked but nothing recorded for any tool contains a figure. A figure with no working tool behind it still fails, so both demos give the same results as before.
+- On that file "Tool failures handled" and "Cost" apply to nothing, because its steps carry no `error` and its traces no cost. That is correct, but the table then shows two rows of "doesn't apply". Open question: hide checks that apply to nothing.
+- 34 tests passing.
+
 ## State on 2026-10-07
 
 **Public repository and hosted page.** The code is at https://github.com/ganeshiyer316/evaldesk (MIT, open source, decided by Ganesh on 2026-10-07). The page is published at https://ganeshiyer316.github.io/evaldesk/ by `.github/workflows/pages.yml`: every push to `main` runs the tests and then publishes the `site/` folder, so **anything pushed to `main` goes live**.

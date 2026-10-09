@@ -21,6 +21,9 @@ let editing = null; // pattern key being edited
 let poll = null;
 const filters = { search: '', show: 'all', kind: 'all', flag: 'all', dims: {} };
 let strategy = 'variety';
+// The order of the conversation list: newest or oldest first. Remembered between visits.
+let sortOrder = 'newest';
+try { if (localStorage.getItem('evaldesk-sort') === 'oldest') sortOrder = 'oldest'; } catch {}
 let judgeMode = null; // failure pattern whose judge is open
 const judgeVersion = {}; // judge id → version number being viewed
 let focusTest = null; // test case opened from a link
@@ -114,9 +117,20 @@ function header() {
     : '';
 }
 
+// Sorts by each trace's time ("at"). Traces without a time keep their file order, after the rest.
+function byTime(list) {
+  const rows = list.map((trace, index) => ({ trace, index, time: Date.parse(trace.at) }));
+  rows.sort((a, b) => {
+    const noA = Number.isNaN(a.time), noB = Number.isNaN(b.time);
+    if (noA || noB) return (noA - noB) || (a.index - b.index);
+    return (sortOrder === 'newest' ? b.time - a.time : a.time - b.time) || (a.index - b.index);
+  });
+  return rows.map((row) => row.trace);
+}
+
 function filtered() {
   const text = filters.search.toLowerCase();
-  return data.traces.filter((trace) => {
+  return byTime(data.traces.filter((trace) => {
     if (filters.kind !== 'all' && trace.kind !== filters.kind) return false;
     for (const [key, value] of Object.entries(filters.dims)) if (value !== 'all' && String(trace.dims?.[key]) !== value) return false;
     if (filters.flag !== 'all' && !(trace.flags ?? []).includes(filters.flag)) return false;
@@ -126,7 +140,7 @@ function filtered() {
     if (filters.show === 'good' && data.state.verdicts[trace.id] !== 'good') return false;
     if (text && !`${trace.id} ${trace.input?.text} ${trace.output?.text} ${trace.summary}`.toLowerCase().includes(text)) return false;
     return true;
-  });
+  }));
 }
 
 function options(values, selected, labels = {}) {
@@ -167,7 +181,8 @@ function listPanel(list) {
       ${dimFilters().map(([key, values]) => `<select id="d-${esc(key)}">${options(values, filters.dims[key] ?? 'all', { all: `Any ${key}` })}</select>`).join('')}
       <select id="f-flag" style="grid-column:1/-1">${options(flags, filters.flag, { all: 'Any warning', ...Object.fromEntries(flags.slice(1).map((flag) => [flag, `⚑ ${flagLabel(flag)}`])) })}</select>
     </div>
-    <div class="count">Showing ${list.length} of ${data.traces.length}</div>
+    <div class="count sortrow"><span>Showing ${list.length} of ${data.traces.length}</span>
+      <select id="sort" title="Order of this list">${options(['newest', 'oldest'], sortOrder, { newest: 'Newest first', oldest: 'Oldest first' })}</select></div>
     <ul class="list">${items || '<li class="empty">Nothing matches these filters.</li>'}</ul>
   </aside>`;
 }
@@ -832,6 +847,7 @@ document.addEventListener('change', (event) => {
   const t = event.target;
   if (t.id === 'domain') { data = null; currentId = null; location.hash = `#/${t.value}/review`; return; }
   if (t.id === 'strategy') { strategy = t.value; return; }
+  if (t.id === 'sort') { sortOrder = t.value === 'oldest' ? 'oldest' : 'newest'; try { localStorage.setItem('evaldesk-sort', sortOrder); } catch {} render(); return; }
   if (t.id === 'testFilter') { testFilter = t.value; render(); return; }
   if (t.id === 'transcription') { act('transcription', { traceId: currentId, value: t.checked }); return; }
   if (t.id?.startsWith('d-')) { filters.dims[t.id.slice(2)] = t.value; render(); return; }

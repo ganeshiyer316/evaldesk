@@ -26,7 +26,7 @@ These are rules of thumb. A fail means "look at this one", not "this is wrong": 
 
 **Review: read and note**
 
-- **Left:** every conversation, in the order of your file.
+- **Left:** every conversation, newest first. The menu above the list switches to oldest first; conversations with no time keep their file order, after the rest.
   - Filter by kind, by any tag on your traces (role, channel and so on), and by warnings (⚑).
   - **Review next** picks one for you:
     - *one of each kind*: from the type of conversation you've reviewed least;

@@ -51,10 +51,18 @@ function groundedNumbers(trace) {
   if (!steps.length) return { result: 'na', why: 'This trace has no steps, so there is nothing to compare the reply with.' };
   const claimed = figures(trace.output?.text).filter((item) => item.matters);
   if (!claimed.length) return { result: 'na', why: 'The reply has no figures to check.' };
-  const sources = [trace.input?.text, ...(trace.context ?? []).map((turn) => turn.text),
-    ...steps.filter((step) => step.section !== 'reasoning').flatMap((step) => [step.request, step.text])];
-  const known = new Set(sources.flatMap((text) => figures(text).map((item) => item.value)));
+  const said = [trace.input?.text, ...(trace.context ?? []).map((turn) => turn.text)];
+  const toolSteps = steps.filter((step) => step.section !== 'reasoning');
+  const tools = toolSteps.flatMap((step) => [step.request, step.text]);
+  const known = new Set([...said, ...tools].flatMap((text) => figures(text).map((item) => item.value)));
   const missing = [...new Set(claimed.filter((item) => !known.has(item.value)).map((item) => item.raw))];
+  // Some products record only a one-line summary of each tool result ("12 events found"), not the
+  // result itself. If a tool worked but nothing recorded for any tool has a figure in it, a figure
+  // missing from the trace proves nothing, so the check stands aside. A figure with no working tool
+  // behind it (no tool ran, or the tool failed) still fails.
+  const worked = toolSteps.some((step) => !step.error);
+  const recorded = tools.some((text) => figures(text).some((item) => item.matters));
+  if (missing.length && worked && !recorded) return { result: 'na', why: 'The tool results recorded for this conversation contain no figures, so there is nothing to check the reply against.' };
   if (!missing.length) return { result: 'pass', why: `Every figure in the reply (${[...new Set(claimed.map((item) => item.raw))].slice(0, 4).join(', ')}) appears in a tool result or a message.` };
   return { result: 'fail', why: `${missing.slice(0, 3).map((raw) => `“${raw}”`).join(', ')} ${missing.length === 1 ? 'is' : 'are'} in the reply but not in any tool result or message.` };
 }

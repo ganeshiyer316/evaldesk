@@ -107,6 +107,8 @@ test('automatic checks: failed tools, figures from nowhere, and real outliers on
   assert.equal(result(trace('f', { steps: [{ section: 'reasoning', text: 'I think the fee is 3.2%' }], output: { text: 'The fee is 3.2%.' } }), 'check_numbers').result, 'fail', 'the AI’s own reasoning is not a source');
   assert.equal(result(trace('g', { steps: [], output: { text: 'It costs £400.' } }), 'check_numbers').result, 'na', 'nothing to compare with');
   assert.equal(result(trace('h', { steps: [{ section: 'tool', text: 'ok' }], output: { text: 'All sorted.' } }), 'check_numbers').result, 'na');
+  assert.equal(result(trace('i', { steps: [{ section: 'tool', text: '12 events found' }], output: { text: 'Swimming is at 4:15.' } }), 'check_numbers').result, 'na', 'a tool that only recorded a summary gives nothing to compare with');
+  assert.equal(result(trace('j', { steps: [{ section: 'tool', text: 'Swimming 3:30 to 4:00' }], output: { text: 'Swimming is at 4:15.' } }), 'check_numbers').result, 'fail', 'a recorded result with figures is still checked');
 
   const timed = withChecks(withOutlierChips([4, 4.2, 4.4, 4.6, 4.8, 5, 5.2, 5.4, 5.6, 6, 19].map((latency, index) => trace(`t${index}`, { metrics: { latency } }))));
   assert.deepEqual(timed.filter((item) => item.flags.includes('slow')).map((item) => item.metrics.latency), [19], 'only the real outlier fails, not whoever is in the top tenth');
