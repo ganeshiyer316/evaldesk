@@ -196,7 +196,7 @@ function listPanel(list) {
         ${trace.flags?.length ? `<span class="mini" title="${esc(trace.flags.map(flagLabel).join(', '))}">⚑ ${trace.flags.length}</span>` : ''}</div>
       <div class="row2">${esc(proactive(trace) ? trace.output?.text : trace.input?.text)}</div></li>`;
   }).join('');
-  return `<aside class="panel sticky">
+  return `<aside class="panel sticky" id="listPanel">
     <div class="next"><button class="primary" id="nextBtn" title="R">Review next</button>
       <select id="strategy">${options(['variety', 'random', 'slice'], strategy, { variety: 'one of each kind', random: 'random', slice: 'next in this list' })}</select></div>
     <div class="filters">
@@ -756,9 +756,26 @@ function renderTests() {
   </section>`;
 }
 
+// Puts the conversation list back where the reviewer left it. It only moves when the open
+// conversation would otherwise be out of sight (Review next, the arrow keys, a link from another
+// tab), and then it brings that conversation to the middle of the list.
+function keepListInPlace(was) {
+  const panel = $('#listPanel');
+  if (!panel || panel.scrollHeight <= panel.clientHeight) return;
+  if (was != null) panel.scrollTop = was;
+  const current = panel.querySelector('.list li.current');
+  if (!current) return;
+  const top = current.getBoundingClientRect().top - panel.getBoundingClientRect().top + panel.scrollTop;
+  const hidden = top < panel.scrollTop || top + current.offsetHeight > panel.scrollTop + panel.clientHeight;
+  if (hidden) panel.scrollTop = Math.max(0, top - (panel.clientHeight - current.offsetHeight) / 2);
+}
+
 function render() {
   header();
   const main = $('#main');
+  // The page is redrawn whole. Remember how far the conversation list was scrolled, so opening a
+  // conversation doesn't make the list jump.
+  const listWas = $('#listPanel')?.scrollTop ?? null;
   const notice = backend.persistent ? '' : '<div class="banner warn"><b>This browser is blocking storage</b> (private window?), so your work will be lost when you close the tab. Use <b>Data → Download a backup</b> before you leave.</div>';
   try {
     main.innerHTML = notice + (TAB_INTRO[view] && data.traces.length ? `<p class="tab-intro">${TAB_INTRO[view]}</p>` : '') + (view === 'patterns' ? renderPatterns() : view === 'judges' ? renderJudges() : view === 'grid' ? renderGrid() : view === 'trends' ? renderTrends() : view === 'tests' ? renderTests() : renderReview());
@@ -768,8 +785,7 @@ function render() {
   }
   if (view === 'tests' && scrollToTest) { $(`#card-${CSS.escape(focusTest)}`)?.scrollIntoView({ block: 'start' }); scrollToTest = false; }
   if (composer) $('#noteText')?.focus();
-  const current = $('.list li.current');
-  current?.scrollIntoView({ block: 'nearest' });
+  keepListInPlace(listWas);
   // On a phone each conversation is its own screen, so start it from the top.
   if (view === 'review' && render.shown !== currentId && matchMedia('(max-width: 700px)').matches) window.scrollTo(0, 0);
   render.shown = currentId;
