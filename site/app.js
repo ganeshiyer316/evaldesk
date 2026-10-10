@@ -505,6 +505,7 @@ function renderPatterns() {
         ${data.state.notes.length ? ' · <a data-do="group-preview">See what is sent</a>' : ''}</span>
     </div>
     ${g.error ? `<div class="banner warn">Grouping failed: ${esc(g.error)}</div>` : ''}
+    ${!g.error && p.warning ? `<div class="banner warn">${esc(p.warning)}</div>` : ''}
     ${sat.likelySaturated ? `<div class="banner">No new failure pattern in the last ${sat.quietRuns} groupings (${sat.notesSinceNewMode} notes). You may have reviewed enough for now (saturation).</div>` : ''}
     ${!p.failureModes.length && !p.goodPatterns.length ? `<div class="banner warn">${noPatternsYet(g)}</div>` : ''}
     <div class="cols">

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { applyEdit, buildGroupingPrompt, emptyPatterns, groupNotes, mergeGrouping, parseGrouping } from '../site/core/patterns.js';
+import { applyEdit, buildGroupingPrompt, emptyGroupingReason, emptyPatterns, groupNotes, mergeGrouping, parseGrouping } from '../site/core/patterns.js';
 import { modeGrid, nearbyTraces, normalizeReleases, pickNext, releasesFromTraces, saturation, trendsByRelease, withOutlierChips } from '../site/core/stats.js';
 
 // Fictional conversations only.
@@ -135,4 +135,23 @@ test('around this time: the same person’s conversations within a few minutes, 
   const window = nearbyTraces(many, many[10]);
   assert.equal(window.length, 9);
   assert.ok(window.some((item) => item.current), 'the current conversation stays in view when there are many');
+});
+
+test('grouping reads a whole answer, recovers patterns from a cut-off one, and says why an answer had none', () => {
+  const whole = JSON.stringify({ failure_modes: [{ key: 'asks-first', name: 'Asks before saving', definition: 'd', note_ids: ['n1', 'n2'], handle: 'fix', handle_why: 'missing rule' }], good_patterns: [{ name: 'Blocks unasked sends', note_ids: ['n3'] }], unassigned_note_ids: ['n4'] });
+  const read = parseGrouping('Here you go:\n' + whole);
+  assert.deepEqual([read.failureModes[0].name, read.failureModes[0].noteIds, read.failureModes[0].handleSuggestion, read.goodPatterns[0].name, read.unassigned, read.partial], ['Asks before saving', ['n1', 'n2'], 'fix', 'Blocks unasked sends', ['n4'], false]);
+  assert.equal(parseGrouping(JSON.stringify({ failure_patterns: [{ name: 'Other key name' }] })).failureModes[0].name, 'Other key name');
+
+  // The same answer, cut off part-way through the second pattern (braces and quotes inside strings must not confuse it).
+  const cut = '{"failure_modes":[{"name":"Asks before saving","definition":"Says \\"which child?\\" {and} saves nothing","note_ids":["n1"]},{"name":"Vague confirm","definition":"Does not say wh';
+  const saved = parseGrouping(cut);
+  assert.deepEqual([saved.failureModes.map((item) => item.name), saved.failureModes[0].definition, saved.partial], [['Asks before saving'], 'Says "which child?" {and} saves nothing', true]);
+
+  const none = parseGrouping('{"failure_modes":[{"name":"Cut bef');
+  assert.deepEqual([none.failureModes, none.goodPatterns, none.partial], [[], [], false]);
+  assert.match(emptyGroupingReason({ content: '', thought: true }, 'some/model'), /some\/model used up its answer on thinking/);
+  assert.match(emptyGroupingReason({ content: '   ' }, 'some/model'), /sent back an empty answer/);
+  assert.match(emptyGroupingReason({ content: '{"failure_modes":[{"name":"Cut bef', finish: 'length' }, 'some/model'), /cut off before the first pattern/);
+  assert.match(emptyGroupingReason({ content: 'I cannot help   with that.' }, 'some/model'), /not with patterns in the form asked for.*began: “I cannot help with that\.”/);
 });

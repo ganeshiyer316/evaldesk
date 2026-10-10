@@ -50,19 +50,59 @@ Return: {"failure_modes":[{"key","name","definition","boundaries","note_ids":[],
   return { system, user };
 }
 
+// Pulls every complete {...} object out of the array that follows "key": [ in a text, even when the
+// text stops part-way through (an answer cut off at the token limit). Braces inside strings are ignored.
+function salvageArray(text, keys) {
+  for (const key of keys) {
+    const at = text.search(new RegExp(`"${key}"\\s*:\\s*\\[`));
+    if (at < 0) continue;
+    const items = [];
+    let depth = 0, start = -1, inString = false, escaped = false;
+    for (let i = text.indexOf('[', at) + 1; i < text.length; i++) {
+      const c = text[i];
+      if (inString) { if (escaped) escaped = false; else if (c === '\\') escaped = true; else if (c === '"') inString = false; continue; }
+      if (c === '"') inString = true;
+      else if (c === '{') { if (depth === 0) start = i; depth++; }
+      else if (c === '}') { depth--; if (depth === 0 && start >= 0) { try { items.push(JSON.parse(text.slice(start, i + 1))); } catch { /* skip a broken item */ } start = -1; } }
+      else if (c === ']' && depth === 0) break;
+    }
+    if (items.length) return items;
+  }
+  return [];
+}
+
+const FAILURE_KEYS = ['failure_modes', 'failure_patterns', 'failureModes', 'failures'];
+const GOOD_KEYS = ['good_patterns', 'goodPatterns', 'good'];
+
 export function parseGrouping(content) {
-  let parsed = {};
-  try { parsed = JSON.parse(String(content ?? '').match(/\{[\s\S]*\}/)?.[0] ?? '{}'); } catch { parsed = {}; }
+  const text = String(content ?? '');
+  let parsed = null;
+  try { parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] ?? ''); } catch { parsed = null; }
   const list = (value) => (Array.isArray(value) ? value : []);
+  const first = (keys) => keys.map((key) => parsed?.[key]).find(Array.isArray);
+  // A whole answer is read as it is. A cut-off one is searched for the patterns that did arrive.
+  const failures = parsed ? list(first(FAILURE_KEYS)) : salvageArray(text, FAILURE_KEYS);
+  const good = parsed ? list(first(GOOD_KEYS)) : salvageArray(text, GOOD_KEYS);
   const mode = (item) => ({ key: slug(item?.key || item?.name), name: String(item?.name ?? '').trim(), definition: String(item?.definition ?? '').trim(),
-    boundaries: String(item?.boundaries ?? '').trim(), noteIds: list(item?.note_ids).map(String),
+    boundaries: String(item?.boundaries ?? '').trim(), noteIds: list(item?.note_ids ?? item?.noteIds).map(String),
     suggestedFix: String(item?.suggested_fix ?? '').trim(), howToMeasure: String(item?.how_to_measure ?? '').trim(),
     ...(['fix', 'code_check', 'judge'].includes(item?.handle) ? { handleSuggestion: item.handle, handleWhy: String(item?.handle_why ?? '').trim() } : {}) });
   return {
-    failureModes: list(parsed.failure_modes).map(mode).filter((item) => item.name),
-    goodPatterns: list(parsed.good_patterns).map(mode).filter((item) => item.name),
-    unassigned: list(parsed.unassigned_note_ids).map(String)
+    failureModes: failures.map(mode).filter((item) => item.name),
+    goodPatterns: good.map(mode).filter((item) => item.name),
+    unassigned: list(parsed?.unassigned_note_ids).map(String),
+    partial: !parsed && (failures.length > 0 || good.length > 0)
   };
+}
+
+// Says, in plain words, why an answer held no patterns, so the next step is clear.
+export function emptyGroupingReason(reply, model) {
+  const text = String(reply?.content ?? '').trim();
+  if (!text) return reply?.thought || reply?.finish === 'length'
+    ? `${model} used up its answer on thinking and wrote nothing. Choose a different model for grouping in Settings.`
+    : `${model} sent back an empty answer. Try again, or choose a different model for grouping in Settings.`;
+  if (reply?.finish === 'length') return `${model}’s answer was cut off before the first pattern was complete. Choose a different model for grouping in Settings.`;
+  return `${model} answered, but not with patterns in the form asked for. Try again, or choose a different model in Settings. Its answer began: “${text.replace(/\s+/g, ' ').slice(0, 140)}”`;
 }
 
 // Combines a fresh grouping with what the reviewer already decided.
@@ -106,8 +146,10 @@ export async function groupNotes({ domain, notes, traces, patterns, apiKey, mode
   const reply = await chat({ purpose: 'Grouping notes into patterns', apiKey, model, baseUrl, fetchImpl, json: true, temperature: 0.2, maxTokens: 8000, timeoutMs,
     messages: [{ role: 'system', content: system }, { role: 'user', content: user }] });
   const result = parseGrouping(reply.content);
-  if (!result.failureModes.length && !result.goodPatterns.length) throw new Error('The model returned no patterns. Try again.');
-  return mergeGrouping({ previous: patterns, result, notes, now, model });
+  if (!result.failureModes.length && !result.goodPatterns.length) throw new Error(emptyGroupingReason(reply, model));
+  const merged = mergeGrouping({ previous: patterns, result, notes, now, model });
+  // A cut-off answer still gives the patterns that arrived whole; say so, since some notes will be left over.
+  return result.partial ? { ...merged, warning: `${model}’s answer was cut off, so this grouping is incomplete: some notes are not in a pattern yet. Group again, or choose a different model in Settings.` } : { ...merged, warning: null };
 }
 
 // The reviewer's corrections. Every edit locks the pattern so the next run keeps it.

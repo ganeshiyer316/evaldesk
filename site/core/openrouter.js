@@ -29,7 +29,11 @@ export async function chat({ purpose = 'AI call', apiKey, model, baseUrl = 'http
     let parsed = null;
     try { parsed = JSON.parse(text); } catch { parsed = null; }
     if (!response.ok) throw new Error(`OpenRouter HTTP ${response.status}: ${(parsed?.error?.message ?? text).slice(0, 160)}`);
-    return { content: parsed?.choices?.[0]?.message?.content ?? '', cost: Number(parsed?.usage?.cost ?? 0) };
+    const choice = parsed?.choices?.[0];
+    // finish: "length" means the answer hit the token limit and was cut off. thought: the model
+    // spent tokens on hidden reasoning, which can leave little or nothing for the answer itself.
+    return { content: choice?.message?.content ?? '', cost: Number(parsed?.usage?.cost ?? 0), finish: choice?.finish_reason ?? null,
+      thought: Boolean(choice?.message?.reasoning || parsed?.usage?.completion_tokens_details?.reasoning_tokens) };
   } catch (error) {
     if (error.name === 'AbortError') {
       const waited = timeoutMs >= 120000 ? `${Math.round(timeoutMs / 60000)} minutes` : `${Math.round(timeoutMs / 1000)} seconds`;
