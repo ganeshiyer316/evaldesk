@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { chat } from '../site/core/openrouter.js';
 import { cp, mkdtemp, readFile as readText, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join as joinPath } from 'node:path';
@@ -184,4 +185,25 @@ test('publishing stamps every script address with the release version, and the s
   } finally {
     await rm(folder, { recursive: true, force: true });
   }
+});
+
+test('a model that spends its answer on thinking gets light thinking, then one more try with twice the room', async () => {
+  const answer = (content, extra = {}) => ({ ok: true, status: 200, text: async () => JSON.stringify({ choices: [{ message: { content, ...extra.message }, finish_reason: extra.finish ?? 'stop' }], usage: { cost: 0.01, ...extra.usage } }) });
+  const calls = [];
+  const replies = [answer('', { finish: 'length', usage: { completion_tokens_details: { reasoning_tokens: 900 } } }), answer('{"ok":true}')];
+  const result = await chat({ apiKey: 'k', model: 'some/model', messages: [{ role: 'user', content: 'hi' }], maxTokens: 1000,
+    fetchImpl: async (url, options) => { calls.push(JSON.parse(options.body)); return replies[calls.length - 1]; } });
+  assert.deepEqual(calls.map((body) => [body.max_tokens, body.reasoning]), [[1000, { effort: 'low' }], [2000, { effort: 'low' }]]);
+  assert.deepEqual([result.content, result.cost], ['{"ok":true}', 0.02], 'the second answer is used and both tries are counted in the cost');
+
+  // A normal answer is not retried, and an answer that is empty for another reason is left alone.
+  let count = 0;
+  await chat({ apiKey: 'k', model: 'some/model', messages: [], fetchImpl: async () => { count += 1; return answer('fine'); } });
+  assert.equal(count, 1);
+  count = 0;
+  const still = await chat({ apiKey: 'k', model: 'some/model', messages: [], fetchImpl: async () => { count += 1; return answer('', { finish: 'length' }); } });
+  assert.deepEqual([count, still.content], [2, ''], 'it tries twice at most');
+  count = 0;
+  await chat({ apiKey: 'k', model: 'some/model', messages: [], thinking: null, secondTry: false, fetchImpl: async (url, options) => { count += 1; assert.ok(!('reasoning' in JSON.parse(options.body))); return answer(''); } });
+  assert.equal(count, 1);
 });

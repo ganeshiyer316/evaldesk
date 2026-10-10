@@ -10,11 +10,23 @@ const sent = [];
 // The most recent requests, newest first. Kept in memory only.
 export const sentLog = () => [...sent];
 
+// Many models think before they answer, and the thinking counts against the same limit as the
+// answer. Left alone, a model can spend the whole limit thinking and write nothing (seen with a
+// 55-note grouping). So every call asks for light thinking, and an empty answer gets one more try
+// with twice the room.
 export async function chat({ purpose = 'AI call', apiKey, model, baseUrl = 'https://openrouter.ai', messages, fetchImpl = fetch,
-  maxTokens = 700, temperature = 0, timeoutMs = 60000, json = false }) {
+  maxTokens = 700, temperature = 0, timeoutMs = 60000, json = false, thinking = 'low', secondTry = true }) {
   if (!apiKey) throw new Error(NO_KEY);
+  const first = await ask({ purpose, apiKey, model, baseUrl, messages, fetchImpl, maxTokens, temperature, timeoutMs, json, thinking });
+  const wroteNothing = !String(first.content ?? '').trim() && (first.thought || first.finish === 'length');
+  if (!wroteNothing || !secondTry) return first;
+  const second = await ask({ purpose: `${purpose} (second try, more room)`, apiKey, model, baseUrl, messages, fetchImpl, maxTokens: maxTokens * 2, temperature, timeoutMs, json, thinking });
+  return { ...second, cost: first.cost + second.cost };
+}
+
+async function ask({ purpose, apiKey, model, baseUrl, messages, fetchImpl, maxTokens, temperature, timeoutMs, json, thinking }) {
   const body = { model, temperature, max_tokens: maxTokens, messages, ...(json ? { response_format: { type: 'json_object' } } : {}),
-    usage: { include: true }, provider: ZDR_ONLY };
+    ...(thinking ? { reasoning: { effort: thinking } } : {}), usage: { include: true }, provider: ZDR_ONLY };
   sent.unshift({ at: new Date().toISOString(), purpose, to: `${baseUrl.replace(/\/+$/, '')}/api/v1/chat/completions`, body });
   sent.length = Math.min(sent.length, 30);
   const controller = new AbortController();

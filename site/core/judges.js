@@ -122,10 +122,14 @@ export async function runJudge({ prompt, traces, labels, apiKey, model = DEFAULT
       const index = next++;
       const trace = traces[index];
       try {
-        const reply = await chat({ purpose: `Judge: checking ${trace.id}`, apiKey, model, baseUrl, fetchImpl, messages: [{ role: 'system', content: prompt },
+        // Room for a short verdict plus the thinking some models do first.
+        const reply = await chat({ purpose: `Judge: checking ${trace.id}`, apiKey, model, baseUrl, fetchImpl, maxTokens: 2000, messages: [{ role: 'system', content: prompt },
           { role: 'user', content: `Conversation to check:\n\n${traceAsText(trace)}` }] });
         cost += reply.cost;
-        rows[index] = { traceId: trace.id, human: labelOf.get(trace.id) ?? null, ...parseVerdict(reply.content) };
+        const verdict = parseVerdict(reply.content);
+        // An empty answer is not a verdict: say what happened instead of leaving the reason blank.
+        rows[index] = { traceId: trace.id, human: labelOf.get(trace.id) ?? null, ...verdict,
+          ...(!verdict.judge && !String(reply.content ?? '').trim() ? { critique: `Judge error: ${model} wrote no answer${reply.thought || reply.finish === 'length' ? ' (it used its answer up on thinking)' : ''}. Choose a different model for this judge.` } : {}) };
       } catch (error) {
         rows[index] = { traceId: trace.id, human: labelOf.get(trace.id) ?? null, judge: null, critique: `Judge error: ${error.message}` };
       }
@@ -160,7 +164,7 @@ Current prompt:\n<<<\n${version.prompt}\n>>>
 Current results on the tuning set: catches ${score.catches.count} of ${score.catches.of} real failures; leaves ${score.leavesAlone.count} of ${score.leavesAlone.of} good replies alone.
 Disagreements:\n${wrong.join('\n') || '(none)'}
 Training conversations you may use as examples:\n${train.join('\n') || '(none)'}`;
-  const reply = await chat({ purpose: 'Judge: writing a better prompt', apiKey, model, baseUrl, fetchImpl, json: true, maxTokens: 4000, timeoutMs: 120000,
+  const reply = await chat({ purpose: 'Judge: writing a better prompt', apiKey, model, baseUrl, fetchImpl, json: true, maxTokens: 8000, timeoutMs: 120000,
     messages: [{ role: 'system', content: system }, { role: 'user', content: user }] });
   let parsed = {};
   try { parsed = JSON.parse(reply.content.match(/\{[\s\S]*\}/)?.[0] ?? '{}'); } catch { parsed = {}; }

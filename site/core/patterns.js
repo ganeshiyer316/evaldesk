@@ -143,7 +143,7 @@ export async function groupNotes({ domain, notes, traces, patterns, apiKey, mode
   if (!apiKey) throw new Error(NO_KEY);
   if (!notes.length) throw new Error('Add a few notes first.');
   const { system, user } = buildGroupingPrompt({ domain, notes, traces, patterns });
-  const reply = await chat({ purpose: 'Grouping notes into patterns', apiKey, model, baseUrl, fetchImpl, json: true, temperature: 0.2, maxTokens: 8000, timeoutMs,
+  const reply = await chat({ purpose: 'Grouping notes into patterns', apiKey, model, baseUrl, fetchImpl, json: true, temperature: 0.2, maxTokens: 16000, timeoutMs,
     messages: [{ role: 'system', content: system }, { role: 'user', content: user }] });
   const result = parseGrouping(reply.content);
   if (!result.failureModes.length && !result.goodPatterns.length) throw new Error(emptyGroupingReason(reply, model));
