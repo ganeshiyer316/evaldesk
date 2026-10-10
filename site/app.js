@@ -317,6 +317,18 @@ function casePanel(trace) {
   </section>`;
 }
 
+// Why there are no patterns yet, naming the one thing that is actually in the way.
+function noPatternsYet(grouping) {
+  const notes = data.state.notes.length;
+  const conversations = new Set(data.state.notes.map((note) => note.traceId)).size;
+  const ready = `Your ${notes} note${notes === 1 ? '' : 's'} on ${conversations} conversation${conversations === 1 ? '' : 's'}`;
+  if (conversations < 5) return `No patterns yet. Write notes on at least 5 conversations, then group them. You have notes on ${conversations} so far.`;
+  if (!grouping.available) return backend.mode === 'local'
+    ? `${ready} are ready to group. The only thing missing is an OpenRouter key: add OPENROUTER_API_KEY to .env and restart.`
+    : `${ready} are ready to group. The only thing missing is an OpenRouter key, because grouping uses an AI model. <a data-do="open-settings"><b>Add your key in Settings</b></a>, then press “Group my notes now”.`;
+  return `${ready} are ready. Press <b>Group my notes now</b>.`;
+}
+
 // "2 s earlier", "26 s later", "1 min later"
 function offsetText(seconds) {
   const size = Math.abs(seconds);
@@ -493,7 +505,7 @@ function renderPatterns() {
     </div>
     ${g.error ? `<div class="banner warn">Grouping failed: ${esc(g.error)}</div>` : ''}
     ${sat.likelySaturated ? `<div class="banner">No new failure pattern in the last ${sat.quietRuns} groupings (${sat.notesSinceNewMode} notes). You may have reviewed enough for now (saturation).</div>` : ''}
-    ${!p.failureModes.length && !p.goodPatterns.length ? `<div class="banner warn">No patterns yet. Write notes on at least 5 conversations, then group them.${g.available ? '' : ' (Needs an OpenRouter key.)'}</div>` : ''}
+    ${!p.failureModes.length && !p.goodPatterns.length ? `<div class="banner warn">${noPatternsYet(g)}</div>` : ''}
     <div class="cols">
       <div><h3>Failure patterns (${p.failureModes.length})</h3>${p.failureModes.map((mode) => patternCard(mode, 'failure')).join('') || '<p class="small">None yet.</p>'}</div>
       <div><h3>Good patterns (${p.goodPatterns.length})</h3>${p.goodPatterns.map((mode) => patternCard(mode, 'good')).join('') || '<p class="small">None yet. Notes about what works well end up here.</p>'}
