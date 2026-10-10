@@ -122,8 +122,16 @@ export function mergeGrouping({ previous, result, notes, now = new Date(), model
       return { ...base, noteIds: [...new Set(item.noteIds)].filter(allowed(item.key)), locked: Boolean(old?.locked),
         feedback: old?.feedback ?? [], ...(old?.handle ? { handle: old.handle } : {}), createdAt: old?.createdAt ?? now.toISOString(), isNew: !old };
     });
+    // A cut-off answer only tells us about the patterns that arrived. Everything it did not get to
+    // stays exactly as it was, and a pattern it did mention keeps the notes it already had.
+    if (result.partial) {
+      for (const item of merged) {
+        const old = oldByKey.get(item.key);
+        if (old) item.noteIds = [...new Set([...(old.noteIds ?? []), ...item.noteIds])].filter(allowed(item.key));
+      }
+    }
     for (const old of oldList ?? []) {
-      if (old.locked && !used.has(old.key)) merged.push({ ...old, noteIds: (old.noteIds ?? []).filter(allowed(old.key)), isNew: false });
+      if ((old.locked || result.partial) && !used.has(old.key)) merged.push({ ...old, noteIds: (old.noteIds ?? []).filter(allowed(old.key)), isNew: false });
     }
     return merged.filter((item) => item.noteIds.length || item.locked);
   }
@@ -134,8 +142,10 @@ export function mergeGrouping({ previous, result, notes, now = new Date(), model
     ...previous,
     failureModes, goodPatterns,
     unassigned: result.unassigned.filter((id) => noteIds.has(id)),
-    lastRunAt: now.toISOString(), lastRunNoteCount: notes.length,
-    history: [...(previous.history ?? []), { at: now.toISOString(), notes: notes.length, newModes, model }].slice(-50)
+    // An incomplete run does not count as "grouped": the next automatic grouping should still happen,
+    // and it says nothing about whether new patterns have stopped appearing.
+    ...(result.partial ? {} : { lastRunAt: now.toISOString(), lastRunNoteCount: notes.length }),
+    history: [...(previous.history ?? []), { at: now.toISOString(), notes: notes.length, newModes, model, ...(result.partial ? { partial: true } : {}) }].slice(-50)
   };
 }
 

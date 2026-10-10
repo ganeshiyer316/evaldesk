@@ -142,7 +142,8 @@ export function pickNext({ traces, state, strategy = 'variety', slice = null, ra
 
 // Saturation: how many notes and groupings since the last new failure mode appeared.
 export function saturation(patterns, state) {
-  const runs = patterns?.history ?? [];
+  // Incomplete runs (an answer cut off part-way) say nothing about saturation.
+  const runs = (patterns?.history ?? []).filter((run) => !run.partial);
   let quietRuns = 0;
   for (const run of [...runs].reverse()) {
     if (run.newModes > 0) break;

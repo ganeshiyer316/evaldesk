@@ -17,16 +17,30 @@ export const sentLog = () => [...sent];
 export async function chat({ purpose = 'AI call', apiKey, model, baseUrl = 'https://openrouter.ai', messages, fetchImpl = fetch,
   maxTokens = 700, temperature = 0, timeoutMs = 60000, json = false, thinking = 'low', secondTry = true }) {
   if (!apiKey) throw new Error(NO_KEY);
-  const first = await ask({ purpose, apiKey, model, baseUrl, messages, fetchImpl, maxTokens, temperature, timeoutMs, json, thinking });
-  const wroteNothing = !String(first.content ?? '').trim() && (first.thought || first.finish === 'length');
-  if (!wroteNothing || !secondTry) return first;
-  const second = await ask({ purpose: `${purpose} (second try, more room)`, apiKey, model, baseUrl, messages, fetchImpl, maxTokens: maxTokens * 2, temperature, timeoutMs, json, thinking });
-  return { ...second, cost: first.cost + second.cost };
+  const common = { apiKey, model, baseUrl, messages, fetchImpl, temperature, timeoutMs, json };
+  const first = await ask({ ...common, purpose, maxTokens, thinking });
+  // "Crowded out": the answer is empty or was cut off, and thinking used tokens. Asking for light
+  // thinking is not always obeyed (one model spent 15,318 of 16,000 tokens thinking anyway).
+  const crowded = (reply) => (reply.finish === 'length' || !String(reply.content ?? '').trim()) && (reply.thought || reply.finish === 'length');
+  if (!crowded(first) || !secondTry) return first;
+  let cost = first.cost;
+  // Second try: thinking switched off, same room. Some providers refuse that setting; then go on.
+  try {
+    const second = await ask({ ...common, purpose: `${purpose} (second try, thinking off)`, maxTokens, thinking: false });
+    cost += second.cost;
+    if (!crowded(second)) return { ...second, cost };
+  } catch (error) {
+    if (!/HTTP 4\d\d/.test(error.message)) throw error;
+  }
+  // Third and last try: light thinking again, with twice the room.
+  const third = await ask({ ...common, purpose: `${purpose} (third try, twice the room)`, maxTokens: maxTokens * 2, thinking });
+  return { ...third, cost: cost + third.cost };
 }
 
 async function ask({ purpose, apiKey, model, baseUrl, messages, fetchImpl, maxTokens, temperature, timeoutMs, json, thinking }) {
   const body = { model, temperature, max_tokens: maxTokens, messages, ...(json ? { response_format: { type: 'json_object' } } : {}),
-    ...(thinking ? { reasoning: { effort: thinking } } : {}), usage: { include: true }, provider: ZDR_ONLY };
+    // thinking: 'low' asks for light thinking, false switches it off, null leaves the model's own setting.
+    ...(thinking === false ? { reasoning: { enabled: false } } : thinking ? { reasoning: { effort: thinking } } : {}), usage: { include: true }, provider: ZDR_ONLY };
   const entry = { at: new Date().toISOString(), purpose, to: `${baseUrl.replace(/\/+$/, '')}/api/v1/chat/completions`, body, reply: null };
   sent.unshift(entry);
   sent.length = Math.min(sent.length, 30);

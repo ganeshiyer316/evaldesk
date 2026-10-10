@@ -187,25 +187,40 @@ test('publishing stamps every script address with the release version, and the s
   }
 });
 
-test('a model that spends its answer on thinking gets light thinking, then one more try with twice the room', async () => {
-  const answer = (content, extra = {}) => ({ ok: true, status: 200, text: async () => JSON.stringify({ choices: [{ message: { content, ...extra.message }, finish_reason: extra.finish ?? 'stop' }], usage: { cost: 0.01, ...extra.usage } }) });
-  const calls = [];
-  const replies = [answer('', { finish: 'length', usage: { completion_tokens_details: { reasoning_tokens: 900 } } }), answer('{"ok":true}')];
-  const result = await chat({ apiKey: 'k', model: 'some/model', messages: [{ role: 'user', content: 'hi' }], maxTokens: 1000,
-    fetchImpl: async (url, options) => { calls.push(JSON.parse(options.body)); return replies[calls.length - 1]; } });
-  assert.deepEqual(calls.map((body) => [body.max_tokens, body.reasoning]), [[1000, { effort: 'low' }], [2000, { effort: 'low' }]]);
-  assert.deepEqual([result.content, result.cost], ['{"ok":true}', 0.02], 'the second answer is used and both tries are counted in the cost');
+test('a model whose thinking crowds out its answer gets a try with thinking off, then one with twice the room', async () => {
+  const answer = (content, extra = {}) => ({ ok: true, status: 200, text: async () => JSON.stringify({ choices: [{ message: { content }, finish_reason: extra.finish ?? 'stop' }], usage: { cost: 0.01, ...extra.usage } }) });
+  const crowdedOut = (content = '') => answer(content, { finish: 'length', usage: { completion_tokens_details: { reasoning_tokens: 900 } } });
+  const run = async (replies, options = {}) => {
+    const calls = [];
+    const result = await chat({ apiKey: 'k', model: 'some/model', messages: [{ role: 'user', content: 'hi' }], maxTokens: 1000, ...options,
+      fetchImpl: async (url, request) => { calls.push(JSON.parse(request.body)); const reply = replies[calls.length - 1]; if (reply instanceof Error) throw reply; return reply; } });
+    return { result, tries: calls.map((body) => [body.max_tokens, body.reasoning ?? null]) };
+  };
 
-  // A normal answer is not retried, and an answer that is empty for another reason is left alone.
-  let count = 0;
-  await chat({ apiKey: 'k', model: 'some/model', messages: [], fetchImpl: async () => { count += 1; return answer('fine'); } });
-  assert.equal(count, 1);
-  count = 0;
-  const still = await chat({ apiKey: 'k', model: 'some/model', messages: [], fetchImpl: async () => { count += 1; return answer('', { finish: 'length' }); } });
-  assert.deepEqual([count, still.content], [2, ''], 'it tries twice at most');
-  count = 0;
-  await chat({ apiKey: 'k', model: 'some/model', messages: [], thinking: null, secondTry: false, fetchImpl: async (url, options) => { count += 1; assert.ok(!('reasoning' in JSON.parse(options.body))); return answer(''); } });
-  assert.equal(count, 1);
+  // Thinking off fixes it: two tries, and both are counted in the cost.
+  let outcome = await run([crowdedOut(), answer('{"ok":true}')]);
+  assert.deepEqual(outcome.tries, [[1000, { effort: 'low' }], [1000, { enabled: false }]]);
+  assert.deepEqual([outcome.result.content, outcome.result.cost], ['{"ok":true}', 0.02]);
+
+  // A cut-off answer with some text in it is retried too, not accepted as it is.
+  outcome = await run([crowdedOut('{"failure_modes":[{"name":"Half'), answer('whole')]);
+  assert.deepEqual([outcome.tries.length, outcome.result.content], [2, 'whole']);
+
+  // Thinking off is still crowded out: a third try with twice the room, and no more after that.
+  outcome = await run([crowdedOut(), crowdedOut(), crowdedOut('still short')]);
+  assert.deepEqual(outcome.tries, [[1000, { effort: 'low' }], [1000, { enabled: false }], [2000, { effort: 'low' }]]);
+  assert.deepEqual([outcome.result.content, outcome.result.cost], ['still short', 0.03]);
+
+  // A provider that refuses "thinking off" does not stop the grouping: go straight to more room.
+  const refused = { ok: false, status: 400, text: async () => JSON.stringify({ error: { message: 'reasoning.enabled is not supported' } }) };
+  outcome = await run([crowdedOut(), refused, answer('fine')]);
+  assert.deepEqual([outcome.tries.length, outcome.tries[2], outcome.result.content], [3, [2000, { effort: 'low' }], 'fine']);
+
+  // A normal answer is not retried, and the tries can be switched off.
+  outcome = await run([answer('fine')]);
+  assert.equal(outcome.tries.length, 1);
+  outcome = await run([crowdedOut()], { thinking: null, secondTry: false });
+  assert.deepEqual(outcome.tries, [[1000, null]]);
 });
 
 test('each request keeps how its answer used the room, never the answer itself', async () => {
@@ -216,4 +231,31 @@ test('each request keeps how its answer used the room, never the answer itself',
   const logged = sentLog().find((item) => item.purpose === 'Room check');
   assert.deepEqual(logged.reply, { finish: 'length', cost: 0.003, characters: 16, reply: 500, thinking: 420, room: 500 });
   assert.ok(!JSON.stringify(logged.reply).includes('private'), 'the answer’s words are not kept');
+});
+
+test('a cut-off grouping never removes patterns, and does not count towards saturation', () => {
+  const notes = ['n1', 'n2', 'n3', 'n4', 'n5'].map((id) => ({ id, traceId: `t-${id}`, text: id, createdAt: '2026-10-01T00:00:00Z' }));
+  const pattern = (key, name, noteIds, extra = {}) => ({ key, name, definition: `${name} def`, boundaries: '', noteIds, suggestedFix: '', howToMeasure: '', ...extra });
+  const whole = mergeGrouping({ previous: emptyPatterns(), notes, now: new Date('2026-10-02T00:00:00Z'),
+    result: { failureModes: [pattern('asks', 'Asks first', ['n1', 'n2']), pattern('wordy', 'Wordy', ['n3'])], goodPatterns: [pattern('blocks', 'Blocks sends', ['n4'])], unassigned: ['n5'], partial: false } });
+  assert.deepEqual(whole.failureModes.map((item) => item.key), ['asks', 'wordy']);
+  assert.equal(whole.lastRunAt, '2026-10-02T00:00:00.000Z');
+
+  // The next answer is cut off after one pattern, which now has one more note.
+  const cut = mergeGrouping({ previous: whole, notes, now: new Date('2026-10-03T00:00:00Z'),
+    result: { failureModes: [pattern('wordy', 'Wordy', ['n5'])], goodPatterns: [], unassigned: [], partial: true } });
+  assert.deepEqual(cut.failureModes.map((item) => [item.key, item.noteIds]), [['wordy', ['n3', 'n5']], ['asks', ['n1', 'n2']]], 'the pattern it reached gains a note; the one it never reached is untouched');
+  assert.deepEqual(cut.goodPatterns.map((item) => [item.key, item.noteIds]), [['blocks', ['n4']]], 'good patterns it never reached are kept');
+  assert.equal(cut.lastRunAt, '2026-10-02T00:00:00.000Z', 'an incomplete run is not recorded as the last grouping');
+  assert.equal(cut.history.at(-1).partial, true);
+
+  // A whole answer may still drop a pattern that no longer fits.
+  const regrouped = mergeGrouping({ previous: whole, notes, now: new Date('2026-10-04T00:00:00Z'),
+    result: { failureModes: [pattern('wordy', 'Wordy', ['n1', 'n2', 'n3'])], goodPatterns: [], unassigned: [], partial: false } });
+  assert.deepEqual(regrouped.failureModes.map((item) => item.key), ['wordy']);
+
+  // Saturation counts quiet runs, but not incomplete ones.
+  const history = [{ at: '2026-10-01T00:00:00Z', newModes: 2 }, { at: '2026-10-02T00:00:00Z', newModes: 0, partial: true }, { at: '2026-10-03T00:00:00Z', newModes: 0, partial: true }];
+  assert.equal(saturation({ history }, { notes }).quietRuns, 0);
+  assert.equal(saturation({ history: [...history, { at: '2026-10-04T00:00:00Z', newModes: 0 }] }, { notes }).quietRuns, 1);
 });
