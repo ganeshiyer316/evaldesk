@@ -58,6 +58,14 @@ main { padding: 16px 18px 60px; }
 .chip { font-size: 12px; padding: 3px 8px; border-radius: 8px; background: var(--amber-bg); color: var(--amber); border: 1px solid #f7c98b; }
 .chip.flag { background: var(--red-bg); color: var(--red); border-color: #f3b5a3; }
 .summary { margin-top: 10px; padding: 10px 12px; background: var(--paper); border-radius: 10px; font-size: 14px; }
+.around { margin-top: 8px; padding: 10px 12px; border: 1px solid var(--line, #dfe3ea); border-radius: 10px; font-size: 13px; }
+.around ol { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 2px; }
+.around li a, .around li.here { display: flex; gap: 10px; align-items: baseline; padding: 3px 6px; border-radius: 6px; text-decoration: none; color: inherit; cursor: pointer; }
+.around li a:hover { background: var(--paper); }
+.around li.here { background: var(--paper); font-weight: 600; }
+.around .when { flex: 0 0 92px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.around .what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.around .id { color: var(--faint); font-size: 12px; white-space: nowrap; }
 .extra { margin-top: 10px; padding: 10px 12px; background: var(--green-bg); border-radius: 10px; font-size: 13px; }
 .block { position: relative; margin-top: 12px; padding: 10px 14px; border-left: 4px solid var(--line); background: #fff; border-radius: 0 10px 10px 0; }
 .block .label { font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }

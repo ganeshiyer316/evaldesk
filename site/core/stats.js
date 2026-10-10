@@ -106,6 +106,25 @@ export function trendsByRelease({ grid, releases }) {
 //   random: any unreviewed trace
 //   variety: one of each kind (every value in the trace's dims), from the group reviewed least so far
 //   slice: the next unreviewed trace in the given list (the current filter)
+// The same person's conversations close in time to this one, oldest first, this one included.
+// People often send several messages in a row, and each becomes its own trace: read alone, a
+// reply can look wrong (or right) for reasons that only show when they are read together.
+// Returns [] when there is nothing else nearby or the trace says neither who nor when.
+export function nearbyTraces(traces, trace, { windowMs = 3 * 60000, limit = 9 } = {}) {
+  const at = Date.parse(trace?.at);
+  if (!trace || Number.isNaN(at) || (trace.person == null && trace.group == null)) return [];
+  const same = (other) => (other.person ?? null) === (trace.person ?? null) && (other.group ?? null) === (trace.group ?? null);
+  const near = traces.filter((other) => same(other) && Math.abs(Date.parse(other.at) - at) <= windowMs)
+    .map((other) => ({ id: other.id, at: other.at, current: other.id === trace.id, seconds: Math.round((Date.parse(other.at) - at) / 1000),
+      label: other.input?.label ?? other.kind ?? '', text: String(other.input?.text ?? other.output?.text ?? '').replace(/\s+/g, ' ').trim() }))
+    .sort((a, b) => a.at.localeCompare(b.at) || String(a.id).localeCompare(String(b.id)));
+  if (near.length < 2) return [];
+  // Keep the ones closest to this conversation when there are many.
+  const index = near.findIndex((item) => item.current);
+  const start = Math.max(0, Math.min(index - Math.floor(limit / 2), near.length - limit));
+  return near.slice(start, start + limit);
+}
+
 export function pickNext({ traces, state, strategy = 'variety', slice = null, random = Math.random }) {
   const pool = (slice ?? traces).filter((trace) => !isReviewed(state, trace.id));
   if (!pool.length) return null;

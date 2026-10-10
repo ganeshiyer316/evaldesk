@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { applyEdit, buildGroupingPrompt, emptyPatterns, groupNotes, mergeGrouping, parseGrouping } from '../site/core/patterns.js';
-import { modeGrid, normalizeReleases, pickNext, releasesFromTraces, saturation, trendsByRelease, withOutlierChips } from '../site/core/stats.js';
+import { modeGrid, nearbyTraces, normalizeReleases, pickNext, releasesFromTraces, saturation, trendsByRelease, withOutlierChips } from '../site/core/stats.js';
 
 // Fictional conversations only.
 const trace = (id, extra = {}) => ({ id, kind: 'message', at: '2026-09-25T08:00:00Z', input: { label: 'Customer', text: `message ${id}` },
@@ -114,4 +114,25 @@ test('automatic checks: failed tools, figures from nowhere, and real outliers on
   assert.deepEqual(timed.filter((item) => item.flags.includes('slow')).map((item) => item.metrics.latency), [19], 'only the real outlier fails, not whoever is in the top tenth');
   assert.equal(timed[0].checks.find((check) => check.key === 'costly').result, 'na');
   assert.deepEqual(checkSummary(withChecks([ignored, grounded])).map((row) => [row.key, row.failed, row.passed, row.na]).slice(0, 2), [['check_tool_failure', 1, 0, 1], ['check_numbers', 1, 1, 0]]);
+});
+
+test('around this time: the same person’s conversations within a few minutes, oldest first', () => {
+  const make = (id, at, person, text, group = 'Shop 1') => ({ id, at, person, group, input: { label: 'Chat', text }, output: { text: 'ok' } });
+  const list = [
+    make('a', '2026-09-01T09:00:00Z', 'Sam', 'Where is my order?'),
+    make('b', '2026-09-01T09:00:02Z', 'Sam', 'It was a lamp'),
+    make('c', '2026-09-01T09:00:28Z', 'Sam', 'Order 104'),
+    make('d', '2026-09-01T09:00:10Z', 'Alex', 'Someone else, same minute'),
+    make('e', '2026-09-01T09:20:00Z', 'Sam', 'Much later'),
+    make('f', '2026-09-01T09:00:05Z', 'Sam', 'Same name, another shop', 'Shop 2')];
+  const near = nearbyTraces(list, list[1]);
+  assert.deepEqual(near.map((item) => [item.id, item.seconds, item.current]), [['a', -2, false], ['b', 0, true], ['c', 26, false]]);
+  assert.equal(near[0].text, 'Where is my order?');
+  assert.deepEqual(nearbyTraces(list, list[4]), [], 'nothing else nearby');
+  assert.deepEqual(nearbyTraces(list, { id: 'x', at: '2026-09-01T09:00:00Z', input: { text: 'no person or group' } }), []);
+  assert.deepEqual(nearbyTraces(list, { ...list[0], at: 'not a time' }), []);
+  const many = Array.from({ length: 20 }, (_, index) => make(`m${String(index).padStart(2, '0')}`, `2026-09-01T10:00:${String(index).padStart(2, '0')}Z`, 'Sam', `message ${index}`));
+  const window = nearbyTraces(many, many[10]);
+  assert.equal(window.length, 9);
+  assert.ok(window.some((item) => item.current), 'the current conversation stays in view when there are many');
 });

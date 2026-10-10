@@ -34,6 +34,7 @@ These are rules of thumb. A fail means "look at this one", not "this is wrong": 
     - *next in this list*: works through your current filter, e.g. all merchant questions.
 - **Middle:** the conversation, as the user saw it.
   - **What happened:** a one-line summary. Each step shows how long it took and what it cost when your traces include that; the slowest and most costly steps are marked, and a failed tool call is shown in red.
+  - **Around this time:** when the same person sent other messages within a few minutes, they are listed here, oldest first. Each is its own conversation. Read them together before judging a reply: a question can look unnecessary, or a reply wrong, only because of what was sent seconds before or after.
   - **Chips:** outliers (slower than 90% of conversations) and warnings, e.g. "Says done, but the record says otherwise".
   - Then the conversation in four parts. Click a part's title to open or close it; the page remembers your choice for the next conversation (**Open all · Close all** at the top). A closed part shows a one-line gist, and 💬 with a number if it has comments.
     - 👤 **User:** the user's message (earlier messages tucked inside).

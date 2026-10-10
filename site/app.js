@@ -1,5 +1,6 @@
 // EvalDesk front end. Plain JavaScript, no build step.
 import { connect, readSettings, writeSettings } from './backend.js';
+import { nearbyTraces } from './core/stats.js';
 
 let backend = null;
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -307,12 +308,31 @@ function casePanel(trace) {
     <div class="chips">${(trace.chips ?? []).map((chip) => `<span class="chip">${esc(chip.text)}</span>`).join('')}
       ${(trace.flags ?? []).filter((flag) => !BUILT_IN_FLAGS[flag]).map((flag) => `<span class="chip flag">⚑ ${esc(flagLabel(flag))}</span>`).join('')}</div>
     <div class="summary"><b>What happened:</b> ${esc(story)}</div>
+    ${aroundStrip(trace)}
     ${failedSteps.length ? `<div class="banner warn">⚠ ${failedSteps.length === 1 ? 'A tool failed' : `${failedSteps.length} tools failed`}: ${failedSteps.map((step) => `<b>${esc(step.label ?? step.fn ?? 'a tool')}</b>`).join(', ')}. Check whether the reply dealt with it.</div>` : ''}
     ${checkPills(trace)}
     ${trace.meta ? `<div class="extra"><b>Extra metadata:</b> ${esc(typeof trace.meta === 'string' ? trace.meta : JSON.stringify(trace.meta))}</div>` : ''}
     <div class="secbar"><a data-sections="open">Open all</a> · <a data-sections="close">Close all</a></div>
     ${conversationSections(trace)}
   </section>`;
+}
+
+// "2 s earlier", "26 s later", "1 min later"
+function offsetText(seconds) {
+  const size = Math.abs(seconds);
+  const amount = size < 60 ? `${size} s` : `${Math.round(size / 60)} min`;
+  return seconds === 0 ? 'same moment' : `${amount} ${seconds < 0 ? 'earlier' : 'later'}`;
+}
+
+// Other conversations from the same person within a few minutes, so a run of messages can be read together.
+function aroundStrip(trace) {
+  const near = nearbyTraces(data.traces, trace);
+  if (!near.length) return '';
+  const clip = (text) => (text.length > 70 ? `${text.slice(0, 69)}…` : text);
+  return `<div class="around"><b>Around this time</b> <span class="small">${esc(trace.person ?? trace.group)} sent ${near.length} messages within a few minutes. Each is its own conversation; read them together.</span>
+    <ol>${near.map((item) => item.current
+      ? `<li class="here"><span class="when">this one</span> <span class="what">${esc(clip(item.text))}</span></li>`
+      : `<li><a data-do="open-trace" data-id="${esc(item.id)}"><span class="when">${esc(offsetText(item.seconds))}</span> <span class="what">${esc(clip(item.text))}</span> <span class="id">${esc(item.id)}${reviewed(item.id) ? ' · reviewed' : ''}</span></a></li>`).join('')}</ol></div>`;
 }
 
 // The automatic checks on one conversation: rules that ran without any AI.
@@ -1063,6 +1083,7 @@ async function doAction(t) {
   const name = t.dataset.do;
   if (name === 'close-dialog') return $('#dialog').close();
   if (name === 'step') return move(Number(t.dataset.step));
+  if (name === 'open-trace') { composer = null; return setHash('review', t.dataset.id); }
   if (name === 'show-flag') {
     Object.assign(filters, { search: '', show: 'all', kind: 'all', flag: t.dataset.name, dims: {} });
     const first = filtered()[0];
