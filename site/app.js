@@ -186,13 +186,15 @@ function dimFilters() {
   return [...values].filter(([, set]) => set.size > 1 && set.size <= 12).slice(0, 4).map(([key, set]) => [key, ['all', ...[...set].sort()]]);
 }
 
+const DOT_MEANING = { none: 'Not reviewed yet', noted: 'Reviewed: has notes', good: 'Reviewed: marked good', bad: 'Reviewed: marked bad' };
+
 function listPanel(list) {
   const flags = ['all', ...new Set(data.traces.flatMap((trace) => trace.flags ?? []))];
   const items = list.map((trace) => {
     const verdict = data.state.verdicts[trace.id];
     const dot = verdict ?? (notesFor(trace.id).length ? 'noted' : '');
     return `<li data-id="${esc(trace.id)}" class="${trace.id === currentId ? 'current' : ''}">
-      <div class="row1"><span class="dot ${dot}"></span>${esc(trace.id)} · ${when(trace.at)} · ${esc(trace.input?.label ?? '')}
+      <div class="row1"><span class="dot ${dot}" title="${DOT_MEANING[dot] ?? DOT_MEANING.none}"></span>${esc(trace.id)}${dot ? '<span class="done" title="Reviewed">✓</span>' : ''} · ${when(trace.at)} · ${esc(trace.input?.label ?? '')}
         ${trace.flags?.length ? `<span class="mini" title="${esc(trace.flags.map(flagLabel).join(', '))}">⚑ ${trace.flags.length}</span>` : ''}</div>
       <div class="row2">${esc(proactive(trace) ? trace.output?.text : trace.input?.text)}</div></li>`;
   }).join('');
@@ -206,8 +208,9 @@ function listPanel(list) {
       ${dimFilters().map(([key, values]) => `<select id="d-${esc(key)}">${options(values, filters.dims[key] ?? 'all', { all: `Any ${key}` })}</select>`).join('')}
       <select id="f-flag" style="grid-column:1/-1">${options(flags, filters.flag, { all: 'Any warning', ...Object.fromEntries(flags.slice(1).map((flag) => [flag, `⚑ ${flagLabel(flag)}`])) })}</select>
     </div>
-    <div class="count sortrow"><span>Showing ${list.length} of ${data.traces.length}</span>
+    <div class="count sortrow"><span>Showing ${list.length} of ${data.traces.length} · <b>${list.filter((trace) => reviewed(trace.id)).length}</b> reviewed, <b>${list.filter((trace) => !reviewed(trace.id)).length}</b> to go</span>
       <select id="sort" title="Order of this list">${options(['newest', 'oldest'], sortOrder, { newest: 'Newest first', oldest: 'Oldest first' })}</select></div>
+    <div class="legend" title="What the dot beside each conversation means"><span><i class="dot"></i> not reviewed</span><span><i class="dot noted"></i> has notes</span><span><i class="dot good"></i> good</span><span><i class="dot bad"></i> bad</span></div>
     <ul class="list">${items || '<li class="empty">Nothing matches these filters.</li>'}</ul>
   </aside>`;
 }

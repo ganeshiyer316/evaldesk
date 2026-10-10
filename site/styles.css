@@ -46,8 +46,13 @@ main { padding: 16px 18px 60px; }
 .list li.current { border-color: var(--blue); background: var(--blue-bg); }
 .list .row1 { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); }
 .list .row2 { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--line); }
-.dot.good { background: var(--green); } .dot.bad { background: var(--red); } .dot.noted { background: var(--amber); }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: 0 0 auto; box-sizing: border-box; background: transparent; border: 1.5px solid var(--faint); }
+.dot.good, .dot.bad, .dot.noted { border-color: transparent; }
+.list .done { color: var(--green); font-weight: 700; margin-left: 3px; }
+.list li:has(.done) .row2 { color: var(--muted); }
+.legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin: 0 0 6px; }
+.legend span { display: inline-flex; gap: 4px; align-items: center; }
+.dot.good { background: var(--green); } .dot.bad { background: var(--red); } .dot.noted { background: var(--blue); }
 .mini { font-size: 11px; padding: 0 6px; border-radius: 6px; background: var(--amber-bg); color: var(--amber); }
 
 .case h2 { margin: 0; font-size: 20px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
