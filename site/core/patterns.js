@@ -5,7 +5,9 @@
 // zero-data-retention provider on OpenRouter.
 import { chat, NO_KEY } from './openrouter.js';
 
-export const DEFAULT_REVIEW_MODEL = 'moonshotai/kimi-k3';
+// The model that completed a real 57-note grouping (2026-10-10) for about a cent. The earlier default
+// timed out on the same job and cost twenty times as much.
+export const DEFAULT_REVIEW_MODEL = 'deepseek/deepseek-v4.1-flash';
 
 export function emptyPatterns() {
   return { failureModes: [], goodPatterns: [], excluded: [], unassigned: [], history: [], lastRunAt: null, lastRunNoteCount: 0 };
