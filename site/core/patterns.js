@@ -98,7 +98,8 @@ export function mergeGrouping({ previous, result, notes, now = new Date(), model
 }
 
 export async function groupNotes({ domain, notes, traces, patterns, apiKey, model = DEFAULT_REVIEW_MODEL,
-  baseUrl = 'https://openrouter.ai', fetchImpl = fetch, now = new Date(), timeoutMs = 120000 }) {
+  baseUrl = 'https://openrouter.ai', fetchImpl = fetch, now = new Date(), timeoutMs = 300000 }) {
+  // Five minutes: a first grouping can hold dozens of notes and a long answer, and two minutes was not enough for a slower model.
   if (!apiKey) throw new Error(NO_KEY);
   if (!notes.length) throw new Error('Add a few notes first.');
   const { system, user } = buildGroupingPrompt({ domain, notes, traces, patterns });

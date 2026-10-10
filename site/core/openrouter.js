@@ -31,7 +31,10 @@ export async function chat({ purpose = 'AI call', apiKey, model, baseUrl = 'http
     if (!response.ok) throw new Error(`OpenRouter HTTP ${response.status}: ${(parsed?.error?.message ?? text).slice(0, 160)}`);
     return { content: parsed?.choices?.[0]?.message?.content ?? '', cost: Number(parsed?.usage?.cost ?? 0) };
   } catch (error) {
-    if (error.name === 'AbortError') throw new Error('The AI model took too long to answer. Try again.');
+    if (error.name === 'AbortError') {
+      const waited = timeoutMs >= 120000 ? `${Math.round(timeoutMs / 60000)} minutes` : `${Math.round(timeoutMs / 1000)} seconds`;
+      throw new Error(`The AI model took too long to answer (no reply after ${waited}). Try again, or choose a faster model in Settings: ${model} may be slow or busy.`);
+    }
     throw error;
   } finally {
     clearTimeout(timer);

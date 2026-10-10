@@ -23,6 +23,7 @@ EvalDesk: an open-source review desk that lets subject-matter experts review an 
 - 35 tests passing. Checked in a browser with made-up data: sort, the shorter checks table, a loaded pack renaming the domain, its flags and its kinds.
 - Earlier turns are labelled "Earlier message · who" (with the time when a turn has `at`) and the input "This message · …" when there are earlier turns. A first-time reviewer had read an earlier turn as part of the message being judged.
 - **Around this time** (2026-10-10): under "What happened", a conversation lists the same person's other conversations within three minutes, oldest first, each a link (`nearbyTraces` in `site/core/stats.js`). It needs `person` or `group` and `at` on the traces, and shows nothing when there is nothing nearby. Reason: a reviewer judged a reply as wrong when the real cause was two more messages sent seconds apart, each its own trace.
+- **First real grouping run timed out** (2026-10-10): 55 notes on 22 conversations, `moonshotai/kimi-k3`, no reply within the 2-minute limit. The limit for grouping is now 5 minutes and the message names the model and points to Settings. Not confirmed fixed: nobody has yet seen a grouping finish against real OpenRouter. If slow models keep timing out, stream the reply and time out on silence instead of total time.
 - Open: a loaded pack renames one of the three built-in domains; there is still no way to add a fourth domain from the page.
 
 ## State on 2026-10-07
