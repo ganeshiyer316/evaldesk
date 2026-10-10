@@ -282,3 +282,5 @@ pre.code { background: var(--paper); border: 1px solid var(--line); border-radiu
   .releases .acts input { width: 100%; }
   dialog { padding: 16px; }
 }
+
+.newer { position: sticky; top: 0; z-index: 9; display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; padding: 8px 14px; background: #fff4d6; border-bottom: 1px solid #e6c766; font-size: 14px; }

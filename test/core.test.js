@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { cp, mkdtemp, readFile as readText, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join as joinPath } from 'node:path';
+import { stampPage, stampScript, stampSite } from '../scripts/stamp-version.mjs';
 import { applyEdit, buildGroupingPrompt, emptyGroupingReason, emptyPatterns, groupNotes, mergeGrouping, parseGrouping } from '../site/core/patterns.js';
 import { modeGrid, nearbyTraces, normalizeReleases, pickNext, releasesFromTraces, saturation, trendsByRelease, withOutlierChips } from '../site/core/stats.js';
 
@@ -154,4 +158,30 @@ test('grouping reads a whole answer, recovers patterns from a cut-off one, and s
   assert.match(emptyGroupingReason({ content: '   ' }, 'some/model'), /sent back an empty answer/);
   assert.match(emptyGroupingReason({ content: '{"failure_modes":[{"name":"Cut bef', finish: 'length' }, 'some/model'), /cut off before the first pattern/);
   assert.match(emptyGroupingReason({ content: 'I cannot help   with that.' }, 'some/model'), /not with patterns in the form asked for.*began: “I cannot help with that\.”/);
+});
+
+test('publishing stamps every script address with the release version, and the stamped site still loads', async () => {
+  assert.equal(stampScript("import { a } from './core/x.js';\nimport b from '../y.js';\nconst s = 'from ./z.js';\nimport c from 'node:fs';", 'abc1234'),
+    "import { a } from './core/x.js?v=abc1234';\nimport b from '../y.js?v=abc1234';\nconst s = 'from ./z.js';\nimport c from 'node:fs';");
+  assert.equal(stampScript("import { a } from './x.js?v=old';", 'new'), "import { a } from './x.js?v=old';", 'an address that already has a version is left alone');
+  const page = stampPage('<meta name="evaldesk-version" content="dev">\n<link rel="stylesheet" href="styles.css">\n<script type="module" src="app.js"></script>', 'abc1234');
+  assert.match(page, /content="abc1234"/);
+  assert.match(page, /href="styles\.css\?v=abc1234"/);
+  assert.match(page, /src="app\.js\?v=abc1234"/);
+
+  const folder = await mkdtemp(joinPath(tmpdir(), 'evaldesk-stamp-'));
+  try {
+    await cp(new URL('../site/', import.meta.url), folder, { recursive: true });
+    await assert.rejects(stampSite(folder, 'bad version!'), /may only hold/);
+    const result = await stampSite(folder, 'abc1234');
+    assert.ok(result.scripts >= 10);
+    assert.deepEqual(JSON.parse(await readText(joinPath(folder, 'version.json'), 'utf8')), { version: 'abc1234' });
+    const engine = await readText(joinPath(folder, 'core', 'engine.js'), 'utf8');
+    assert.ok(!/from '\.\/[^'?]+\.js'/.test(engine), 'no script address in the engine is left without a version');
+    // The stamped engine, with its stamped imports, still loads and works.
+    const stamped = await import(`${new URL(`file://${joinPath(folder, 'core', 'engine.js')}`).href}?check=1`);
+    assert.equal(typeof stamped.createEngine, 'function');
+  } finally {
+    await rm(folder, { recursive: true, force: true });
+  }
 });

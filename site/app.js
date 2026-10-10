@@ -3,6 +3,30 @@ import { connect, readSettings, writeSettings } from './backend.js';
 import { nearbyTraces } from './core/stats.js';
 
 let backend = null;
+// The version this page is running: stamped at publish time, "dev" when run from the files as they are.
+const VERSION = document.querySelector('meta[name="evaldesk-version"]')?.content || 'dev';
+let newerVersion = null;
+
+// An open tab keeps running the code it loaded. Ask now and then whether a newer release is out,
+// and say so: otherwise a fix can be published and the reviewer never gets it.
+async function checkForNewerVersion() {
+  if (VERSION === 'dev' || newerVersion) return;
+  try {
+    const response = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
+    const latest = response.ok ? (await response.json()).version : null;
+    if (latest && latest !== VERSION) { newerVersion = latest; showNewerVersion(); }
+  } catch { /* offline or blocked: try again later */ }
+}
+
+function showNewerVersion() {
+  if (document.getElementById('newer')) return;
+  const bar = document.createElement('div');
+  bar.id = 'newer';
+  bar.className = 'newer';
+  bar.innerHTML = 'A newer version of EvalDesk is out. Your notes and work are kept. <button class="primary" id="reloadNow">Reload to get it</button>';
+  document.body.prepend(bar);
+  bar.querySelector('#reloadNow').addEventListener('click', () => location.reload());
+}
 const $ = (selector, root = document) => root.querySelector(selector);
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const when = (iso) => new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -1065,6 +1089,7 @@ function settingsDialog() {
         <label class="small">Model for new judges <input id="s-judge" value="${esc(saved.judgeModel ?? '')}" placeholder="${esc(data.judgeModel)}"></label>
         <label class="small">Group automatically every … new notes <input id="s-auto" type="number" min="1" value="${esc(saved.autoGroupEvery ?? data.grouping.autoEvery)}"></label></div>`;
   dialog(`<h2>Settings</h2>
+    <p class="small" style="color:var(--faint)">EvalDesk version ${esc(VERSION)}${VERSION === 'dev' ? ' (running from the files, not a published release)' : ''}</p>
     <h3>AI features</h3>
     <p class="small">Reviewing, the grid, test cases and trends need no AI. Two things do: <b>grouping notes into patterns</b> and <b>judges</b>.</p>
     ${ai}
@@ -1184,4 +1209,8 @@ document.addEventListener('click', (event) => {
 });
 
 window.addEventListener('hashchange', route);
+// Look for a newer release when the page opens, when the reviewer comes back to the tab, and every few minutes.
+checkForNewerVersion();
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForNewerVersion(); });
+setInterval(checkForNewerVersion, 5 * 60000);
 route().catch((error) => { $('#main').innerHTML = `<div class="empty">Couldn't load: ${esc(error.message)}</div>`; });

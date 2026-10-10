@@ -27,6 +27,9 @@ jobs:
         with:
           node-version: 22
       - run: npm test
+      # Gives every script address this release's version, so browsers load the new code at once
+      # instead of running a kept copy of the old one, and an open page can tell a newer one is out.
+      - run: node scripts/stamp-version.mjs site "${GITHUB_SHA::7}"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
