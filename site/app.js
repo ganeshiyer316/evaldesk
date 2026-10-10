@@ -341,6 +341,14 @@ function casePanel(trace) {
   </section>`;
 }
 
+// What came back for one request, in a line: how long the answer was, how much of the model's room
+// went on thinking, whether it was cut off, and what it cost. Never the answer's words.
+function replyLine(reply) {
+  const cut = reply.finish === 'length' ? 'cut off at the limit' : reply.characters ? 'complete' : 'empty';
+  const tokens = reply.reply ? `${reply.reply.toLocaleString('en-US')} of ${reply.room.toLocaleString('en-US')} tokens used${reply.thinking ? ` (${reply.thinking.toLocaleString('en-US')} on thinking)` : ''}` : '';
+  return esc([`answer ${cut}`, tokens, reply.cost ? `$${reply.cost.toFixed(4)}` : ''].filter(Boolean).join(' · '));
+}
+
 // Why there are no patterns yet, naming the one thing that is actually in the way.
 function noPatternsYet(grouping) {
   const notes = data.state.notes.length;
@@ -1124,7 +1132,7 @@ async function sentDialog() {
   const { log } = await backend.ask(domainId, 'sent-log');
   dialog(`<h2>What was sent to the AI</h2>
     <p class="small">The last ${log.length} request${log.length === 1 ? '' : 's'} since this ${backend.mode === 'local' ? 'server started' : 'page was opened'}, newest first, exactly as sent. Your key is not shown.</p>
-    ${log.map((item) => `<details><summary>${esc(item.purpose)} · ${esc(item.body.model)} · ${ago(item.at)}</summary><p class="small">To: ${esc(item.to)}</p><pre class="code">${esc(JSON.stringify(item.body, null, 2))}</pre></details>`).join('') || '<p class="empty">Nothing has been sent yet.</p>'}`);
+    ${log.map((item) => `<details><summary>${esc(item.purpose)} · ${esc(item.body.model)} · ${ago(item.at)}${item.reply ? ` · ${replyLine(item.reply)}` : ' · no answer recorded'}</summary><p class="small">To: ${esc(item.to)}</p><pre class="code">${esc(JSON.stringify(item.body, null, 2))}</pre></details>`).join('') || '<p class="empty">Nothing has been sent yet.</p>'}`);
 }
 
 async function previewDialog() {

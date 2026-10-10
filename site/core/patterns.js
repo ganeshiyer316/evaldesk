@@ -149,7 +149,11 @@ export async function groupNotes({ domain, notes, traces, patterns, apiKey, mode
   if (!result.failureModes.length && !result.goodPatterns.length) throw new Error(emptyGroupingReason(reply, model));
   const merged = mergeGrouping({ previous: patterns, result, notes, now, model });
   // A cut-off answer still gives the patterns that arrived whole; say so, since some notes will be left over.
-  return result.partial ? { ...merged, warning: `${model}’s answer was cut off, so this grouping is incomplete: some notes are not in a pattern yet. Group again, or choose a different model in Settings.` } : { ...merged, warning: null };
+  if (!result.partial) return { ...merged, warning: null };
+  // A cut-off answer: say how the model used its room, which shows whether thinking crowded the answer out.
+  const t = reply.tokens ?? {};
+  const used = t.reply ? ` It used ${t.reply.toLocaleString('en-US')} of ${t.room.toLocaleString('en-US')} tokens${t.thinking ? `, ${t.thinking.toLocaleString('en-US')} of them on thinking` : ''}.` : '';
+  return { ...merged, warning: `${model}’s answer was cut off, so this grouping is incomplete: some notes are not in a pattern yet.${used} Group again, or choose a different model in Settings.` };
 }
 
 // The reviewer's corrections. Every edit locks the pattern so the next run keeps it.

@@ -27,7 +27,8 @@ export async function chat({ purpose = 'AI call', apiKey, model, baseUrl = 'http
 async function ask({ purpose, apiKey, model, baseUrl, messages, fetchImpl, maxTokens, temperature, timeoutMs, json, thinking }) {
   const body = { model, temperature, max_tokens: maxTokens, messages, ...(json ? { response_format: { type: 'json_object' } } : {}),
     ...(thinking ? { reasoning: { effort: thinking } } : {}), usage: { include: true }, provider: ZDR_ONLY };
-  sent.unshift({ at: new Date().toISOString(), purpose, to: `${baseUrl.replace(/\/+$/, '')}/api/v1/chat/completions`, body });
+  const entry = { at: new Date().toISOString(), purpose, to: `${baseUrl.replace(/\/+$/, '')}/api/v1/chat/completions`, body, reply: null };
+  sent.unshift(entry);
   sent.length = Math.min(sent.length, 30);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -44,8 +45,15 @@ async function ask({ purpose, apiKey, model, baseUrl, messages, fetchImpl, maxTo
     const choice = parsed?.choices?.[0];
     // finish: "length" means the answer hit the token limit and was cut off. thought: the model
     // spent tokens on hidden reasoning, which can leave little or nothing for the answer itself.
-    return { content: choice?.message?.content ?? '', cost: Number(parsed?.usage?.cost ?? 0), finish: choice?.finish_reason ?? null,
-      thought: Boolean(choice?.message?.reasoning || parsed?.usage?.completion_tokens_details?.reasoning_tokens) };
+    const usage = parsed?.usage ?? {};
+    const thinkingTokens = Number(usage.completion_tokens_details?.reasoning_tokens ?? 0);
+    const result = { content: choice?.message?.content ?? '', cost: Number(usage.cost ?? 0), finish: choice?.finish_reason ?? null,
+      thought: Boolean(choice?.message?.reasoning || thinkingTokens),
+      // How the model used its room: tokens in the whole reply, how many of those were thinking, and the room it was given.
+      tokens: { reply: Number(usage.completion_tokens ?? 0), thinking: thinkingTokens, room: maxTokens } };
+    // Kept beside what was sent (never the answer's words), so a reviewer can see why an answer was short or empty.
+    entry.reply = { finish: result.finish, cost: result.cost, characters: result.content.length, ...result.tokens };
+    return result;
   } catch (error) {
     if (error.name === 'AbortError') {
       const waited = timeoutMs >= 120000 ? `${Math.round(timeoutMs / 60000)} minutes` : `${Math.round(timeoutMs / 1000)} seconds`;

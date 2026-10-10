@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { chat } from '../site/core/openrouter.js';
+import { chat, sentLog } from '../site/core/openrouter.js';
 import { cp, mkdtemp, readFile as readText, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join as joinPath } from 'node:path';
@@ -206,4 +206,14 @@ test('a model that spends its answer on thinking gets light thinking, then one m
   count = 0;
   await chat({ apiKey: 'k', model: 'some/model', messages: [], thinking: null, secondTry: false, fetchImpl: async (url, options) => { count += 1; assert.ok(!('reasoning' in JSON.parse(options.body))); return answer(''); } });
   assert.equal(count, 1);
+});
+
+test('each request keeps how its answer used the room, never the answer itself', async () => {
+  const reply = await chat({ purpose: 'Room check', apiKey: 'k', model: 'some/model', messages: [{ role: 'user', content: 'hi' }], maxTokens: 500, secondTry: false,
+    fetchImpl: async () => ({ ok: true, status: 200, text: async () => JSON.stringify({ choices: [{ message: { content: 'A private answer' }, finish_reason: 'length' }],
+      usage: { cost: 0.003, completion_tokens: 500, completion_tokens_details: { reasoning_tokens: 420 } } }) }) });
+  assert.deepEqual(reply.tokens, { reply: 500, thinking: 420, room: 500 });
+  const logged = sentLog().find((item) => item.purpose === 'Room check');
+  assert.deepEqual(logged.reply, { finish: 'length', cost: 0.003, characters: 16, reply: 500, thinking: 420, room: 500 });
+  assert.ok(!JSON.stringify(logged.reply).includes('private'), 'the answer’s words are not kept');
 });
