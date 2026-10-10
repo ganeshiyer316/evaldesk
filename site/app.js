@@ -326,6 +326,7 @@ function noPatternsYet(grouping) {
   if (!grouping.available) return backend.mode === 'local'
     ? `${ready} are ready to group. The only thing missing is an OpenRouter key: add OPENROUTER_API_KEY to .env and restart.`
     : `${ready} are ready to group. The only thing missing is an OpenRouter key, because grouping uses an AI model. <a data-do="open-settings"><b>Add your key in Settings</b></a>, then press “Group my notes now”.`;
+  if (grouping.running) return `Grouping ${ready.replace(/^Y/, 'y')} now. This usually takes under a minute; the page updates by itself.`;
   return `${ready} are ready. Press <b>Group my notes now</b>.`;
 }
 
